@@ -88,7 +88,7 @@ contract PoolToken is ERC20, DSMath {
     }
 
     function pricePerToken() public view returns(uint) {
-        return 1e18; // TODO - still need to work on it.
+        return 1e18; // TODO - Link to rate logic contract
     }
 
     function deposit(uint amount) public returns(uint) {
@@ -101,6 +101,7 @@ contract PoolToken is ERC20, DSMath {
     }
 
     function withdraw(address owner, uint iAmount) public returns (uint) {
+        // TODO - check balance before withdrawing
         uint amount = wmul(iAmount, pricePerToken());
         _burn(msg.sender, iAmount);
 
