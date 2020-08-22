@@ -67,13 +67,13 @@ contract PoolToken is ERC20, DSMath {
     }
     
     uint dsaAmount;
-    function depositDSA(uint amount) public isChief {
+    function deploy(uint amount) public isChief {
         address _dsa = registry.dsa(address(this));
         baseToken.safeTransfer(_dsa, amount);
         dsaAmount = add(dsaAmount, amount);
     }
 
-    function withdrawDSA(uint amount) public isChief {
+    function claim(uint amount) public isChief {
         // address _dsa = registry.dsa(address(this));
         baseToken.safeTransferFrom(msg.sender, address(this), amount);
         uint totalAmountWithProfit = RateInterface(address(0)).totalBalance(); // TODO - change to => totalBalanceDSA
