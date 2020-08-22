@@ -40,8 +40,6 @@ contract PoolToken is ERC20, DSMath {
     uint private tokenBalance;
     uint private tokenProfit;
     uint private tokenCap;
-    
-    
 
     constructor(
         address _registry,

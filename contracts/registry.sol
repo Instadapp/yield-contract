@@ -22,7 +22,7 @@ contract Registry {
 
   mapping (address => bool) public chief;
   mapping (address => address) public dsa;
-  mapping (address => address) public rateLogic;
+  mapping (address => address) public logic;
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
