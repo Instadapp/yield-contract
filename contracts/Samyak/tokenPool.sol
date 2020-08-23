@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.0;
+pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
@@ -17,16 +17,17 @@ interface AccountInterface {
 
 interface IndexInterface {
   function master() external view returns (address);
+  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 interface RegistryInterface {
   function chief(address) external view returns (bool);
-  function dsa(address) external view returns (address);
-  function rateLogic(address) external view returns (address);
+  function poolLogic(address) external returns (address);
+  function poolCap(address) external view returns (uint);
+  function insureFee(address) external view returns (uint);
 }
 
 interface RateInterface {
-  function pricePerToken() external view returns (uint);
   function totalBalance() external view returns (uint);
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
@@ -36,66 +37,40 @@ contract PoolToken is ERC20, DSMath {
 
     IERC20 public immutable baseToken;
     RegistryInterface public immutable registry;
-    IndexInterface public immutable instaIndex;
+    IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
+    AccountInterface public immutable dsa;
 
-    uint private tokenBalance;
-    uint private tokenProfit;
-    uint private tokenCap;
+    uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 1000000000000000000; // initial 1 token = 1
-    address public settlementLogic;
-    uint public insuranceAmt;
-    
+    uint public insuranceAmt; // insurance amount to keep pool safe
+    bool public shutPool;
+
     constructor(
         address _registry,
-        address _index,
         string memory _name,
         string memory _symbol,
-        address _baseToken
+        address _baseToken,
+        address _origin
     ) public ERC20(_name, _symbol) {
         // TODO - 0
         baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
-        instaIndex = IndexInterface(_index);
-    }
-
-    modifier isMaster() {
-        require(msg.sender == instaIndex.master(), "not-master");
-        _;
+        address _dsa = instaIndex.build(address(this), 1, _origin);
+        dsa = AccountInterface(_dsa);
     }
 
     modifier isChief() {
         require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
         _;
     }
-    
-    uint dsaAmount;
+
     function deploy(uint amount) public isChief {
-        address _dsa = registry.dsa(address(this));
-        baseToken.safeTransfer(_dsa, amount);
-        dsaAmount = add(dsaAmount, amount);
+        baseToken.safeTransfer(address(dsa), amount);
     }
 
-    function claim(uint amount) public isChief {
-        // address _dsa = registry.dsa(address(this));
-        baseToken.safeTransferFrom(msg.sender, address(this), amount);
-        uint totalAmountWithProfit = RateInterface(address(0)).totalBalance(); // TODO - change to => totalBalanceDSA
-        uint _amount = wdiv(wmul(amount, dsaAmount), totalAmountWithProfit);
-        uint profit = sub(amount, _amount);
-        tokenProfit = add(tokenProfit, profit);
-        dsaAmount = sub(dsaAmount, _amount);
-    }
-
-    function getBalance() public view returns(uint) {
-        return sub(add(dsaAmount, baseToken.balanceOf(address(this))), tokenProfit);
-    }
-
-    function pricePerToken() public view returns(uint) {
-        return 1e18; // TODO - Link to rate logic contract
-    }
-
-    function setExchangeRate() public view isChief {
+    function setExchangeRate() public isChief {
         uint _previousRate = exchangeRate;
-        uint _totalToken = RateInterface(settlementLogic).getTotalToken();
+        uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
         uint _currentRate = wdiv(_totalToken, totalSupply());
         if (_currentRate < _previousRate) {
             uint difRate = _previousRate - _currentRate;
@@ -104,40 +79,62 @@ contract PoolToken is ERC20, DSMath {
             _currentRate = _previousRate;
         } else {
             uint difRate = _currentRate - _previousRate;
-            uint insureFee = wmul(difRate, 100000000000000000); // 1e17
-            uint insureFeeAmt = wmul(_totalToken, insureRate);
+            uint insureFee = wmul(difRate, registry.insureFee(address(this))); // 1e17
+            uint insureFeeAmt = wmul(_totalToken, insureFee);
             insuranceAmt = add(insuranceAmt, insureFeeAmt);
             _currentRate = sub(_currentRate, insureFee);
+            tokenBalance = sub(_totalToken, insuranceAmt);
         }
         exchangeRate = _currentRate;
     }
 
-    function settlement(address[] calldata _targets, bytes[] calldata _datas, address _origin) external view isChief {
-        address _dsa = registry.dsa(address(this));
+    function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
         if (_targets.length > 0 && _datas.length > 0) {
-            AccountInterface(_dsa).cast(_targets, _datas, _origin);
+            dsa.cast(_targets, _datas, _origin);
         }
         setExchangeRate();
     }
 
-    function deposit(uint amount) public returns(uint) {
-        uint _newTokenBal = add(tokenBalance, amount);
-        require(_newTokenBal <= getBalance(), "deposit-cap-reached");
+    function deposit(uint tknAmt) public payable returns(uint) {
+        require(!shutPool, "pool-shut");
+        uint _newTokenBal = add(tokenBalance, tknAmt);
+        require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
-        baseToken.safeTransferFrom(msg.sender, address(this), amount);
-        uint iAmt = wdiv(amount, exchangeRate);
-        _mint(msg.sender, iAmt);
+        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
+        uint _mintAmt = wdiv(tknAmt, exchangeRate);
+        _mint(msg.sender, _mintAmt);
     }
 
-    function withdraw(address owner, uint iAmount) public returns (uint) {
-        // TODO - check balance before withdrawing
-        uint amount = wmul(iAmount, exchangeRate);
-        _burn(msg.sender, iAmount);
+    function withdraw(uint tknAmt, address to) public returns (uint) {
+        require(!shutPool, "pool-shut");
+        uint poolBal = baseToken.balanceOf(address(this));
+        require(tknAmt <= poolBal, "not-enough-liquidity-available");
+        uint _bal = balanceOf(msg.sender);
+        uint _tknBal = wmul(_bal, exchangeRate);
+        uint _burnAmt;
+        uint _tknAmt;
+        if (tknAmt == uint(-1)) {
+            _burnAmt = _bal;
+            _tknAmt = wmul(_burnAmt, exchangeRate);
+        } else {
+            require(tknAmt <= _tknBal, "balance-exceeded");
+            _burnAmt = wdiv(tknAmt, exchangeRate);
+            _tknAmt = tknAmt;
+        }
 
-        baseToken.safeTransfer(owner, amount);
+        _burn(msg.sender, _burnAmt);
+
+        baseToken.safeTransfer(to, _tknAmt);
     }
 
-    function withdraw(uint amount) public returns (uint) {
-        return withdraw(msg.sender, amount);
+    function addInsurance(uint tknAmt) public {
+        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
+        insuranceAmt = tknAmt;
     }
+
+    function shutdown() public {
+        require(msg.sender == instaIndex.master(), "not-master");
+        shutPool = !shutPool;
+    }
+
 }
