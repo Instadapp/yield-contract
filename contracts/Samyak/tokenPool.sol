@@ -117,14 +117,13 @@ contract PoolToken is ERC20, DSMath {
         emit LogDeposit(tknAmt, _mintAmt);
     }
 
-    function withdraw(uint tknAmt, address to) external returns (uint) {
+    function withdraw(uint tknAmt, address to) external returns (uint _tknAmt) {
         require(!shutPool, "pool-shut");
         uint poolBal = baseToken.balanceOf(address(this));
         require(tknAmt <= poolBal, "not-enough-liquidity-available");
         uint _bal = balanceOf(msg.sender);
         uint _tknBal = wmul(_bal, exchangeRate);
         uint _burnAmt;
-        uint _tknAmt;
         if (tknAmt == uint(-1)) {
             _burnAmt = _bal;
             _tknAmt = wmul(_burnAmt, exchangeRate);
