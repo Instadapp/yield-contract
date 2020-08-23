@@ -64,7 +64,7 @@ contract PoolToken is ERC20, DSMath {
         _;
     }
 
-    function deploy(uint amount) public isChief {
+    function deploy(uint amount) external isChief {
         baseToken.safeTransfer(address(dsa), amount);
     }
 
@@ -95,7 +95,7 @@ contract PoolToken is ERC20, DSMath {
         setExchangeRate();
     }
 
-    function deposit(uint tknAmt) external payable returns(uint) {
+    function deposit(uint tknAmt) public payable returns(uint) {
         require(!shutPool, "pool-shut");
         uint _newTokenBal = add(tokenBalance, tknAmt);
         require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
@@ -135,6 +135,10 @@ contract PoolToken is ERC20, DSMath {
     function shutdown() external {
         require(msg.sender == instaIndex.master(), "not-master");
         shutPool = !shutPool;
+    }
+
+    receive() external payable {
+        deposit(msg.value);
     }
 
 }
