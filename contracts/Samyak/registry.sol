@@ -17,6 +17,10 @@ contract Registry {
 
   event LogAddChief(address indexed chief);
   event LogRemoveChief(address indexed chief);
+  event LogSwitchPool(address pool, bool);
+  event LogUpdatePoolCap(address pool, uint newCap);
+  event LogUpdatePoolLogic(address pool, address newLogic);
+  event LogUpdateInsureFee(address pool, uint newFee);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
@@ -58,25 +62,29 @@ contract Registry {
     emit LogRemoveChief(_chief);
   }
 
-  function enablePool(address _pool) external isMaster {
-    isPool[_pool] = true;
+  function switchPool(address _pool) external isMaster {
+    isPool[_pool] = !isPool[_pool];
+    emit LogSwitchPool(_pool, isPool[_pool]);
   }
 
   function updatePoolCap(address _pool, uint _newCap) external isChief {
     require(isPool[_pool], "not-a-pool");
     poolCap[_pool] = _newCap;
+    emit LogUpdatePoolCap(_pool, _newCap);
   }
 
-  function updateLogic(address _pool, address _newLogic) external isChief {
+  function updatePoolLogic(address _pool, address _newLogic) external isChief {
     require(isPool[_pool], "not-a-pool");
     require(_newLogic != address(0), "address-0");
     poolLogic[_pool] = _newLogic;
+    emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
   function updateInsureFee(address _pool, uint _newFee) external isChief {
     require(isPool[_pool], "not-a-pool");
     require(_newFee < 1000000000000000000, "insure-fee-limit-reached");
     insureFee[_pool] = _newFee;
+    emit LogUpdateInsureFee(_pool, _newFee);
   }
 
   constructor(address _chief) public {

@@ -35,25 +35,32 @@ interface RateInterface {
 contract PoolToken is ERC20, DSMath {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable baseToken;
-    RegistryInterface public immutable registry;
+    event LogDeploy(uint amount);
+    event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
+    event LogSettle(uint settleTime);
+    event LogDeposit(uint depositAmt, uint poolMintAmt);
+    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
+    event LogAddInsurance(uint amount);
+    event LogPoolShut(bool);
+
+    // IERC20 public immutable baseToken;
+    RegistryInterface public immutable registry; // Pool Registry
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
-    AccountInterface public immutable dsa;
+    AccountInterface public immutable dsa; // Pool's DSA account
 
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 1000000000000000000; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
-    bool public shutPool;
+    bool public shutPool; // shutdown deposits and withdrawals
 
     constructor(
         address _registry,
         string memory _name,
         string memory _symbol,
-        address _baseToken,
         address _origin
     ) public ERC20(_name, _symbol) {
         // TODO - 0
-        baseToken = IERC20(_baseToken);
+        // baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
         address _dsa = instaIndex.build(address(this), 1, _origin);
         dsa = AccountInterface(_dsa);
@@ -65,7 +72,8 @@ contract PoolToken is ERC20, DSMath {
     }
 
     function deploy(uint amount) external isChief {
-        baseToken.safeTransfer(address(dsa), amount);
+        payable(address(dsa)).transfer(amount);
+        emit LogDeploy(amount);
     }
 
     function setExchangeRate() public isChief {
@@ -86,6 +94,7 @@ contract PoolToken is ERC20, DSMath {
             tokenBalance = sub(_totalToken, insuranceAmt);
         }
         exchangeRate = _currentRate;
+        emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
     function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
@@ -93,21 +102,25 @@ contract PoolToken is ERC20, DSMath {
             dsa.cast(_targets, _datas, _origin);
         }
         setExchangeRate();
+
+        emit LogSettle(block.timestamp);
     }
 
     function deposit(uint tknAmt) public payable returns(uint) {
         require(!shutPool, "pool-shut");
-        uint _newTokenBal = add(tokenBalance, tknAmt);
+        require(tknAmt == msg.value, "unmatched-amount");
+        uint _newTokenBal = add(tokenBalance, msg.value);
         require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
-        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-        uint _mintAmt = wdiv(tknAmt, exchangeRate);
+        uint _mintAmt = wdiv(msg.value, exchangeRate);
         _mint(msg.sender, _mintAmt);
+
+        emit LogDeposit(tknAmt, _mintAmt);
     }
 
     function withdraw(uint tknAmt, address to) external returns (uint) {
         require(!shutPool, "pool-shut");
-        uint poolBal = baseToken.balanceOf(address(this));
+        uint poolBal = address(this).balance;
         require(tknAmt <= poolBal, "not-enough-liquidity-available");
         uint _bal = balanceOf(msg.sender);
         uint _tknBal = wmul(_bal, exchangeRate);
@@ -124,17 +137,21 @@ contract PoolToken is ERC20, DSMath {
 
         _burn(msg.sender, _burnAmt);
 
-        baseToken.safeTransfer(to, _tknAmt);
+        payable(to).transfer(_tknAmt);
+
+        emit LogWithdraw(tknAmt, _burnAmt);
     }
 
-    function addInsurance(uint tknAmt) external {
-        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-        insuranceAmt = tknAmt;
+    function addInsurance(uint tknAmt) external payable {
+        require(tknAmt == msg.value, "unmatched-amount");
+        insuranceAmt += tknAmt;
+        emit LogAddInsurance(tknAmt);
     }
 
     function shutdown() external {
         require(msg.sender == instaIndex.master(), "not-master");
         shutPool = !shutPool;
+        emit LogPoolShut(shutPool);
     }
 
     receive() external payable {

@@ -35,15 +35,23 @@ interface RateInterface {
 contract PoolToken is ERC20, DSMath {
     using SafeERC20 for IERC20;
 
-    IERC20 public immutable baseToken;
-    RegistryInterface public immutable registry;
-    IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
-    AccountInterface public immutable dsa;
+    event LogDeploy(uint amount);
+    event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
+    event LogSettle(uint settleTime);
+    event LogDeposit(uint depositAmt, uint poolMintAmt);
+    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
+    event LogAddInsurance(uint amount);
+    event LogPoolShut(bool);
+
+    IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
+    RegistryInterface public immutable registry; // Pool Registry
+    IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
+    AccountInterface public immutable dsa; // Pool's DSA account
 
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 1000000000000000000; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
-    bool public shutPool;
+    bool public shutPool; // shutdown deposits and withdrawals
 
     constructor(
         address _registry,
@@ -52,7 +60,6 @@ contract PoolToken is ERC20, DSMath {
         address _baseToken,
         address _origin
     ) public ERC20(_name, _symbol) {
-        // TODO - 0
         baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
         address _dsa = instaIndex.build(address(this), 1, _origin);
@@ -66,6 +73,7 @@ contract PoolToken is ERC20, DSMath {
 
     function deploy(uint amount) public isChief {
         baseToken.safeTransfer(address(dsa), amount);
+        emit LogDeploy(amount);
     }
 
     function setExchangeRate() public isChief {
@@ -86,6 +94,7 @@ contract PoolToken is ERC20, DSMath {
             tokenBalance = sub(_totalToken, insuranceAmt);
         }
         exchangeRate = _currentRate;
+        emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
     function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
@@ -93,6 +102,7 @@ contract PoolToken is ERC20, DSMath {
             dsa.cast(_targets, _datas, _origin);
         }
         setExchangeRate();
+        emit LogSettle(block.timestamp);
     }
 
     function deposit(uint tknAmt) external payable returns(uint) {
@@ -103,6 +113,8 @@ contract PoolToken is ERC20, DSMath {
         baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
         uint _mintAmt = wdiv(tknAmt, exchangeRate);
         _mint(msg.sender, _mintAmt);
+
+        emit LogDeposit(tknAmt, _mintAmt);
     }
 
     function withdraw(uint tknAmt, address to) external returns (uint) {
@@ -125,16 +137,20 @@ contract PoolToken is ERC20, DSMath {
         _burn(msg.sender, _burnAmt);
 
         baseToken.safeTransfer(to, _tknAmt);
+
+        emit LogWithdraw(tknAmt, _burnAmt);
     }
 
-    function addInsurance(uint tknAmt) external {
+    function addInsurance(uint tknAmt) external payable {
         baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-        insuranceAmt = tknAmt;
+        insuranceAmt += tknAmt;
+        emit LogAddInsurance(tknAmt);
     }
 
     function shutdown() external {
         require(msg.sender == instaIndex.master(), "not-master");
         shutPool = !shutPool;
+        emit LogPoolShut(shutPool);
     }
 
 }
