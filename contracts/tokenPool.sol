@@ -147,5 +147,4 @@ contract PoolToken is ERC20, DSMath {
         shutPool = !shutPool;
         emit LogPoolShut(shutPool);
     }
-
 }

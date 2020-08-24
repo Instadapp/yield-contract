@@ -4,9 +4,8 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-import { DSMath } from "./../libs/safeMath.sol";
+import { DSMath } from "./libs/safeMath.sol";
 
 // TODO - Add ReentrancyGuard lib
 
@@ -28,13 +27,10 @@ interface RegistryInterface {
 }
 
 interface RateInterface {
-  function totalBalance() external view returns (uint);
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
 contract PoolToken is ERC20, DSMath {
-    using SafeERC20 for IERC20;
-
     event LogDeploy(uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleTime);
@@ -49,7 +45,7 @@ contract PoolToken is ERC20, DSMath {
     AccountInterface public immutable dsa; // Pool's DSA account
 
     uint private tokenBalance; // total token balance since last rebalancing
-    uint public exchangeRate = 1000000000000000000; // initial 1 token = 1
+    uint public exchangeRate = 10 ** 18; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
     bool public shutPool; // shutdown deposits and withdrawals
 
@@ -59,7 +55,6 @@ contract PoolToken is ERC20, DSMath {
         string memory _symbol,
         address _origin
     ) public ERC20(_name, _symbol) {
-        // TODO - 0
         // baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
         address _dsa = instaIndex.build(address(this), 1, _origin);
@@ -87,7 +82,7 @@ contract PoolToken is ERC20, DSMath {
             _currentRate = _previousRate;
         } else {
             uint difRate = _currentRate - _previousRate;
-            uint insureFee = wmul(difRate, registry.insureFee(address(this))); // 1e17
+            uint insureFee = wmul(difRate, registry.insureFee(address(this)));
             uint insureFeeAmt = wmul(_totalToken, insureFee);
             insuranceAmt = add(insuranceAmt, insureFeeAmt);
             _currentRate = sub(_currentRate, insureFee);
