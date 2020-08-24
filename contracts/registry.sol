@@ -17,11 +17,14 @@ contract Registry {
   event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
+  event LogAddPool(address indexed token, address indexed pool);
+  event LogRemovePool(address indexed token, address indexed pool);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   mapping (address => bool) public chief;
   mapping (address => bool) public signer;
+  mapping (address => address) public poolToken;
   mapping (address => bool) public isPool;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
@@ -79,6 +82,28 @@ contract Registry {
       require(signer[_signer], "signer-already-disabled");
       delete signer[_signer];
       emit LogRemoveSigner(_signer);
+  }
+
+  /**
+    * @dev Add New Pool
+    * @param token ERC20 token address
+    * @param pool pool address
+  */
+  function addPool(address token, address pool) external isMaster { // TODO: all good?
+    require(token != address(0) && pool != address(0), "address-not-valid");
+    poolToken[token] = pool;
+    emit LogAddPool(token, pool);
+  }
+
+  /**
+    * @dev Remove Pool
+    * @param token ERC20 token address
+  */
+  function removePool(address token) external isMaster { // TODO: all good?
+    require(token != address(0), "address-not-valid");
+    address poolAddr = poolToken[token];
+    delete poolToken[token];
+    emit LogRemovePool(token, poolAddr);
   }
 
   function switchPool(address _pool) external isMaster {

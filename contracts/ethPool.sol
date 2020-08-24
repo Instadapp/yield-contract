@@ -44,6 +44,7 @@ contract PoolToken is ERC20, DSMath {
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
     AccountInterface public immutable dsa; // Pool's DSA account
 
+    IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 10 ** 18; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
@@ -53,9 +54,10 @@ contract PoolToken is ERC20, DSMath {
         address _registry,
         string memory _name,
         string memory _symbol,
+        address _baseToken,
         address _origin
     ) public ERC20(_name, _symbol) {
-        // baseToken = IERC20(_baseToken);
+        baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
         address _dsa = instaIndex.build(address(this), 1, _origin);
         dsa = AccountInterface(_dsa);
@@ -148,8 +150,6 @@ contract PoolToken is ERC20, DSMath {
         emit LogPoolShut(shutPool);
     }
 
-    receive() external payable {
-        deposit(msg.value);
-    }
+    receive() external payable {}
 
 }
