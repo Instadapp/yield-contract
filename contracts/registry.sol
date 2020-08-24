@@ -67,7 +67,7 @@ contract Registry {
     * @param _signer Address of the new signer.
   */
   function enableSigner(address _signer) external isChief {
-      require(_signer != address(0), "address-not-valid");
+      require(_signer != address(0), "invalid-address");
       require(!signer[_signer], "signer-already-enabled");
       signer[_signer] = true;
       emit LogAddSigner(_signer);
@@ -78,7 +78,7 @@ contract Registry {
     * @param _signer Address of the existing signer.
   */
   function disableSigner(address _signer) external isChief {
-      require(_signer != address(0), "address-not-valid");
+      require(_signer != address(0), "invalid-address");
       require(signer[_signer], "signer-already-disabled");
       delete signer[_signer];
       emit LogRemoveSigner(_signer);
@@ -90,7 +90,7 @@ contract Registry {
     * @param pool pool address
   */
   function addPool(address token, address pool) external isMaster { // TODO: all good?
-    require(token != address(0) && pool != address(0), "address-not-valid");
+    require(token != address(0) && pool != address(0), "invalid-address");
     poolToken[token] = pool;
     emit LogAddPool(token, pool);
   }
@@ -100,7 +100,7 @@ contract Registry {
     * @param token ERC20 token address
   */
   function removePool(address token) external isMaster { // TODO: all good?
-    require(token != address(0), "address-not-valid");
+    require(token != address(0), "invalid-address");
     address poolAddr = poolToken[token];
     delete poolToken[token];
     emit LogRemovePool(token, poolAddr);
@@ -112,20 +112,20 @@ contract Registry {
   }
 
   function updatePoolCap(address _pool, uint _newCap) external isChief {
-    require(isPool[_pool], "not-a-pool");
+    require(isPool[_pool], "not-pool");
     poolCap[_pool] = _newCap;
     emit LogUpdatePoolCap(_pool, _newCap);
   }
 
   function updatePoolLogic(address _pool, address _newLogic) external isChief {
-    require(isPool[_pool], "not-a-pool");
-    require(_newLogic != address(0), "address-0");
+    require(isPool[_pool], "not-pool");
+    require(_newLogic != address(0), "invalid-address");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
   function updateInsureFee(address _pool, uint _newFee) external isChief {
-    require(isPool[_pool], "not-a-pool");
+    require(isPool[_pool], "not-pool");
     require(_newFee < 1000000000000000000, "insure-fee-limit-reached");
     insureFee[_pool] = _newFee;
     emit LogUpdateInsureFee(_pool, _newFee);
