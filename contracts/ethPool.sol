@@ -37,7 +37,7 @@ contract PoolToken is ERC20, DSMath {
     event LogDeposit(uint depositAmt, uint poolMintAmt);
     event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
     event LogAddInsurance(uint amount);
-    event LogPoolShut(bool);
+    event LogPausePool(bool);
 
     // IERC20 public immutable baseToken;
     RegistryInterface public immutable registry; // Pool Registry
@@ -48,7 +48,7 @@ contract PoolToken is ERC20, DSMath {
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 10 ** 18; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
-    bool public shutPool; // shutdown deposits and withdrawals
+    bool public pausePool; // shutdown deposits and withdrawals
 
     constructor(
         address _registry,
@@ -104,7 +104,7 @@ contract PoolToken is ERC20, DSMath {
     }
 
     function deposit(uint tknAmt) public payable returns(uint) {
-        require(!shutPool, "pool-shut");
+        require(!pausePool, "pool-shut");
         require(tknAmt == msg.value, "unmatched-amount");
         uint _newTokenBal = add(tokenBalance, msg.value);
         require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
@@ -116,7 +116,7 @@ contract PoolToken is ERC20, DSMath {
     }
 
     function withdraw(uint tknAmt, address to) external returns (uint _tknAmt) {
-        require(!shutPool, "pool-shut");
+        require(!pausePool, "pool-shut");
         uint poolBal = address(this).balance;
         require(tknAmt <= poolBal, "not-enough-liquidity-available");
         uint _bal = balanceOf(msg.sender);
@@ -146,8 +146,8 @@ contract PoolToken is ERC20, DSMath {
 
     function shutdown() external {
         require(msg.sender == instaIndex.master(), "not-master");
-        shutPool = !shutPool;
-        emit LogPoolShut(shutPool);
+        pausePool = !pausePool;
+        emit LogPausePool(pausePool);
     }
 
     receive() external payable {}
