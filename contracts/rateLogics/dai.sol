@@ -25,30 +25,12 @@ contract RateLogic is DSMath {
     CTokenInterface ctoken = CTokenInterface(address(0));
     CTokenInterface token = CTokenInterface(address(0));
 
-    uint fee = 1e17; // 10%
-    function totalBalanceDSA() public view returns (uint) {
-        address _dsa;
-        uint abal = atoken.balanceOf(_dsa);
-        uint cbal = wmul(ctoken.balanceOf(_dsa), ctoken.getExchangeRate());
-        uint bal = token.balanceOf(_dsa);
-        return add(abal, add(cbal, bal));
-    }
-
-    function totalBalance() public view returns (uint) {
+    function getTotalToken() public view returns (uint) {
         address _dsa;
         uint abal = atoken.balanceOf(_dsa);
         uint cbal = wmul(ctoken.balanceOf(_dsa), ctoken.getExchangeRate());
         uint dsaBal = token.balanceOf(_dsa);
         uint poolBal = token.balanceOf(address(poolToken));
         return add(add(abal, poolBal) , add(cbal, dsaBal));
-    }
-
-    function pricePerToken() public view returns(uint256) {
-        // TODO - add security logic
-        uint _totalBalance = totalBalanceDSA();
-        uint profit = sub(_totalBalance, poolToken.dsaAmount());
-        uint leftProfit = wmul(profit, fee);
-        uint leftTotalBalance = add(leftProfit, poolToken.dsaAmount());
-        return wdiv(leftTotalBalance, poolToken.totalSupply());
     }
 }

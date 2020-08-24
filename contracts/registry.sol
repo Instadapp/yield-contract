@@ -11,6 +11,8 @@ contract Registry {
 
   event LogAddChief(address indexed chief);
   event LogRemoveChief(address indexed chief);
+  event LogAddSigner(address indexed signer);
+  event LogRemoveSigner(address indexed signer);
   event LogSwitchPool(address pool, bool);
   event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
@@ -19,6 +21,7 @@ contract Registry {
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   mapping (address => bool) public chief;
+  mapping (address => bool) public signer;
   mapping (address => bool) public isPool;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
@@ -56,6 +59,28 @@ contract Registry {
     emit LogRemoveChief(_chief);
   }
 
+  /**
+    * @dev Enable New Signer.
+    * @param _signer Address of the new signer.
+  */
+  function enableSigner(address _signer) external isChief {
+      require(_signer != address(0), "address-not-valid");
+      require(!signer[_signer], "signer-already-enabled");
+      signer[_signer] = true;
+      emit LogAddSigner(_signer);
+  }
+
+  /**
+    * @dev Disable Signer.
+    * @param _signer Address of the existing signer.
+  */
+  function disableSigner(address _signer) external isChief {
+      require(_signer != address(0), "address-not-valid");
+      require(signer[_signer], "signer-already-disabled");
+      delete signer[_signer];
+      emit LogRemoveSigner(_signer);
+  }
+
   function switchPool(address _pool) external isMaster {
     isPool[_pool] = !isPool[_pool];
     emit LogSwitchPool(_pool, isPool[_pool]);
@@ -84,6 +109,5 @@ contract Registry {
   constructor(address _chief) public {
     chief[_chief] = true;
     emit LogAddChief(_chief);
-  }
-  
+  } 
 }

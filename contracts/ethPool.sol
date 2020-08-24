@@ -136,7 +136,7 @@ contract PoolToken is ERC20, DSMath {
 
         _burn(msg.sender, _burnAmt);
 
-        payable(to).transfer(_tknAmt);
+        payable(to).transfer(_tknAmt); // TODO - if this is also Reentrancy prone attack or not.
 
         emit LogWithdraw(tknAmt, _burnAmt);
     }
