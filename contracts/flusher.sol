@@ -35,7 +35,7 @@ contract Flusher {
   }
 
   event LogInit(address indexed owner);
-  event LogSwitch(bool indexed boooool);
+  event LogSwitch(bool indexed shieldState);
 
   event LogDeposit(
     address indexed caller,
@@ -58,7 +58,7 @@ contract Flusher {
     uint amount
   );
 
-  function deposit(address token) public isSigner {
+  function deposit(address token) public payable isSigner {
     require(address(token) != address(0), "invalid-token");
 
     address poolToken = registry.poolToken(token);
@@ -135,7 +135,7 @@ contract Flusher {
    */
   function spell(address _target, bytes calldata _data) external isChief {
     require(!shield, "shield-access-denied");
-    require(shieldBlockTime != 0 && shieldBlockTime <= block.number, "less-than-ninty-days");
+    require(shieldBlockTime != 0 && shieldBlockTime <= block.number, "more-than-ninty-days");
     require(_target != address(0), "target-invalid");
     require(_data.length > 0, "data-invalid");
     bytes memory _callData = _data;
@@ -152,5 +152,7 @@ contract Flusher {
     }
     require(_owner == owner, "owner-change-denied");
   }
+
+  receive() external payable {}
 
 }
