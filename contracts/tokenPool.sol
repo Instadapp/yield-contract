@@ -2,7 +2,6 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 
@@ -29,7 +28,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is DSMath, ERC20, ERC20Pausable {
+contract PoolToken is DSMath, ERC20Pausable {
     using SafeERC20 for IERC20;
 
     event LogDeploy(uint amount);
