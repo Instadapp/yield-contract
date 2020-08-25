@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 
 import { DSMath } from "./libs/safeMath.sol";
 
@@ -28,7 +29,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is ERC20, DSMath {
+contract PoolToken is DSMath, ERC20, ERC20Pausable {
     using SafeERC20 for IERC20;
 
     event LogDeploy(uint amount);
@@ -144,7 +145,6 @@ contract PoolToken is ERC20, DSMath {
 
     function shutdown() external {
         require(msg.sender == instaIndex.master(), "not-master");
-        pausePool = !pausePool;
-        emit LogPausePool(pausePool);
+        paused() ? _unpause() : _pause();
     }
 }
