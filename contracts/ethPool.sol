@@ -8,8 +8,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import { DSMath } from "./libs/safeMath.sol";
 
-// TODO - Add ReentrancyGuard lib
-
 interface AccountInterface {
   function enable(address authority) external;
   function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
