@@ -1,2 +1,2 @@
-# dsa-yield-contract
-DSA Yield ERC20 Pool Contract
+# yield-contract
+Yield Contract
