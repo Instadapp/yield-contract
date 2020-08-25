@@ -126,7 +126,7 @@ contract Registry {
 
   function updateInsureFee(address _pool, uint _newFee) external isChief {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 1000000000000000000, "insure-fee-limit-reached");
+    require(_newFee < 10 ** 18, "insure-fee-limit-reached");
     insureFee[_pool] = _newFee;
     emit LogUpdateInsureFee(_pool, _newFee);
   }
