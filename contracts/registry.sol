@@ -24,8 +24,8 @@ contract Registry {
 
   mapping (address => bool) public chief;
   mapping (address => bool) public signer;
-  mapping (address => address) public poolToken;
   mapping (address => bool) public isPool;
+  mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
@@ -89,8 +89,9 @@ contract Registry {
     * @param token ERC20 token address
     * @param pool pool address
   */
-  function addPool(address token, address pool) external isMaster { // TODO: all good?
+  function addPool(address token, address pool) external isMaster {
     require(token != address(0) && pool != address(0), "invalid-address");
+    require(poolToken[token] == address(0), "pool-already-added");
     poolToken[token] = pool;
     emit LogAddPool(token, pool);
   }
@@ -99,8 +100,9 @@ contract Registry {
     * @dev Remove Pool
     * @param token ERC20 token address
   */
-  function removePool(address token) external isMaster { // TODO: all good?
+  function removePool(address token) external isMaster {
     require(token != address(0), "invalid-address");
+    require(poolToken[token] != address(0), "pool-already-removed");
     address poolAddr = poolToken[token];
     delete poolToken[token];
     emit LogRemovePool(token, poolAddr);
