@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import { DSMath } from "./libs/safeMath.sol";
 
@@ -31,7 +32,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is ERC20Pausable, DSMath {
+contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogDeploy(uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleTime);
@@ -114,7 +115,7 @@ contract PoolToken is ERC20Pausable, DSMath {
     emit LogDeposit(tknAmt, _mintAmt);
   }
 
-  function withdraw(uint tknAmt, address to) external whenNotPaused returns (uint _tknAmt) {
+  function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
     uint poolBal = address(this).balance;
     require(tknAmt <= poolBal, "not-enough-liquidity-available");
     uint _bal = balanceOf(msg.sender);
