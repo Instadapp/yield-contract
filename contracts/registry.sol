@@ -117,7 +117,7 @@ contract Registry {
     emit LogUpdatePoolCap(_pool, _newCap);
   }
 
-  function updatePoolLogic(address _pool, address _newLogic) external isChief {
+  function updatePoolLogic(address _pool, address _newLogic) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newLogic != address(0), "invalid-address");
     poolLogic[_pool] = _newLogic;
