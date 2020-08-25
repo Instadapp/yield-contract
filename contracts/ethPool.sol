@@ -2,7 +2,6 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -41,12 +40,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogAddInsurance(uint amount);
   event LogPausePool(bool);
 
-  // IERC20 public immutable baseToken;
   RegistryInterface public immutable registry; // Pool Registry
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
   AccountInterface public immutable dsa; // Pool's DSA account
 
-  IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
+  IERC20 public immutable baseToken; // Base token.
   uint private tokenBalance; // total token balance since last rebalancing
   uint public exchangeRate = 10 ** 18; // initial 1 token = 1
   uint public insuranceAmt; // insurance amount to keep pool safe
@@ -132,7 +130,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
     _burn(msg.sender, _burnAmt);
 
-    payable(to).transfer(_tknAmt); // TODO - if this is also Reentrancy prone attack or not.
+    payable(to).transfer(_tknAmt);
 
     emit LogWithdraw(tknAmt, _burnAmt);
   }
