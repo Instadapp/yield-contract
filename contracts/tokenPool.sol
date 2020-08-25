@@ -29,7 +29,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is DSMath, ERC20, ERC20Pausable {
+contract PoolToken is DSMath, ERC20Pausable {
     using SafeERC20 for IERC20;
 
     event LogDeploy(uint amount);
@@ -48,7 +48,6 @@ contract PoolToken is DSMath, ERC20, ERC20Pausable {
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 10 ** 18; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
-    bool public pausePool; // shutdown deposits and withdrawals
 
     constructor(
         address _registry,
@@ -69,82 +68,80 @@ contract PoolToken is DSMath, ERC20, ERC20Pausable {
     }
 
     function deploy(uint amount) public isChief {
-        baseToken.safeTransfer(address(dsa), amount);
-        emit LogDeploy(amount);
+      baseToken.safeTransfer(address(dsa), amount);
+      emit LogDeploy(amount);
     }
 
     function setExchangeRate() public isChief {
-        uint _previousRate = exchangeRate;
-        uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-        uint _currentRate = wdiv(_totalToken, totalSupply());
-        if (_currentRate < _previousRate) {
-            uint difRate = _previousRate - _currentRate;
-            uint difTkn = wmul(_totalToken, difRate);
-            insuranceAmt = sub(insuranceAmt, difTkn);
-            _currentRate = _previousRate;
-        } else {
-            uint difRate = _currentRate - _previousRate;
-            uint insureFee = wmul(difRate, registry.insureFee(address(this)));
-            uint insureFeeAmt = wmul(_totalToken, insureFee);
-            insuranceAmt = add(insuranceAmt, insureFeeAmt);
-            _currentRate = sub(_currentRate, insureFee);
-            tokenBalance = sub(_totalToken, insuranceAmt);
-        }
-        exchangeRate = _currentRate;
-        emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
+      uint _previousRate = exchangeRate;
+      uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
+      uint _currentRate = wdiv(_totalToken, totalSupply());
+      if (_currentRate < _previousRate) {
+        uint difRate = _previousRate - _currentRate;
+        uint difTkn = wmul(_totalToken, difRate);
+        insuranceAmt = sub(insuranceAmt, difTkn);
+        _currentRate = _previousRate;
+      } else {
+        uint difRate = _currentRate - _previousRate;
+        uint insureFee = wmul(difRate, registry.insureFee(address(this)));
+        uint insureFeeAmt = wmul(_totalToken, insureFee);
+        insuranceAmt = add(insuranceAmt, insureFeeAmt);
+        _currentRate = sub(_currentRate, insureFee);
+        tokenBalance = sub(_totalToken, insuranceAmt);
+      }
+      exchangeRate = _currentRate;
+      emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
     function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
-        if (_targets.length > 0 && _datas.length > 0) {
-            dsa.cast(_targets, _datas, _origin);
-        }
-        setExchangeRate();
-        emit LogSettle(block.timestamp);
+      if (_targets.length > 0 && _datas.length > 0) {
+        dsa.cast(_targets, _datas, _origin);
+      }
+      setExchangeRate();
+      emit LogSettle(block.timestamp);
     }
 
-    function deposit(uint tknAmt) external payable returns(uint) {
-        require(!pausePool, "pool-shut");
-        uint _newTokenBal = add(tokenBalance, tknAmt);
-        require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
+    function deposit(uint tknAmt) external whenNotPaused payable returns(uint) {
+      uint _newTokenBal = add(tokenBalance, tknAmt);
+      require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
-        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-        uint _mintAmt = wdiv(tknAmt, exchangeRate);
-        _mint(msg.sender, _mintAmt);
+      baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
+      uint _mintAmt = wdiv(tknAmt, exchangeRate);
+      _mint(msg.sender, _mintAmt);
 
-        emit LogDeposit(tknAmt, _mintAmt);
+      emit LogDeposit(tknAmt, _mintAmt);
     }
 
-    function withdraw(uint tknAmt, address to) external returns (uint _tknAmt) {
-        require(!pausePool, "pool-shut");
-        uint poolBal = baseToken.balanceOf(address(this));
-        require(tknAmt <= poolBal, "not-enough-liquidity-available");
-        uint _bal = balanceOf(msg.sender);
-        uint _tknBal = wmul(_bal, exchangeRate);
-        uint _burnAmt;
-        if (tknAmt == uint(-1)) {
-            _burnAmt = _bal;
-            _tknAmt = wmul(_burnAmt, exchangeRate);
-        } else {
-            require(tknAmt <= _tknBal, "balance-exceeded");
-            _burnAmt = wdiv(tknAmt, exchangeRate);
-            _tknAmt = tknAmt;
-        }
+    function withdraw(uint tknAmt, address to) external whenNotPaused returns (uint _tknAmt) {
+      uint poolBal = baseToken.balanceOf(address(this));
+      require(tknAmt <= poolBal, "not-enough-liquidity-available");
+      uint _bal = balanceOf(msg.sender);
+      uint _tknBal = wmul(_bal, exchangeRate);
+      uint _burnAmt;
+      if (tknAmt == uint(-1)) {
+        _burnAmt = _bal;
+        _tknAmt = wmul(_burnAmt, exchangeRate);
+      } else {
+        require(tknAmt <= _tknBal, "balance-exceeded");
+        _burnAmt = wdiv(tknAmt, exchangeRate);
+        _tknAmt = tknAmt;
+      }
 
-        _burn(msg.sender, _burnAmt);
+      _burn(msg.sender, _burnAmt);
 
-        baseToken.safeTransfer(to, _tknAmt);
+      baseToken.safeTransfer(to, _tknAmt);
 
-        emit LogWithdraw(tknAmt, _burnAmt);
+      emit LogWithdraw(tknAmt, _burnAmt);
     }
 
     function addInsurance(uint tknAmt) external payable {
-        baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-        insuranceAmt += tknAmt;
-        emit LogAddInsurance(tknAmt);
+      baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
+      insuranceAmt += tknAmt;
+      emit LogAddInsurance(tknAmt);
     }
 
     function shutdown() external {
-        require(msg.sender == instaIndex.master(), "not-master");
-        paused() ? _unpause() : _pause();
+      require(msg.sender == instaIndex.master(), "not-master");
+      paused() ? _unpause() : _pause();
     }
 }
