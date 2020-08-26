@@ -23,7 +23,7 @@ contract Flusher {
   RegistryInterface public constant registry = RegistryInterface(address(0)); // TODO - Change while deploying.
   bool public shield;
   uint256 public shieldBlockTime;
-  uint256 internal waitBlockTime = 518400; // 90 days blocktime.
+  uint256 internal waitBlockTime = 172800; // 30 days blocktime.
 
   modifier isSigner {
     require(registry.signer(msg.sender), "not-signer");
@@ -136,7 +136,7 @@ contract Flusher {
    */
   function spell(address _target, bytes calldata _data) external isChief {
     require(!shield, "shield-access-denied");
-    require(shieldBlockTime != 0 && shieldBlockTime <= block.number, "more-than-ninty-days");
+    require(shieldBlockTime != 0 && shieldBlockTime <= block.number, "more-than-30-days");
     require(_target != address(0), "target-invalid");
     require(_data.length > 0, "data-invalid");
     bytes memory _callData = _data;
