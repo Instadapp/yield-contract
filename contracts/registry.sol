@@ -29,6 +29,7 @@ contract Registry {
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
+  mapping (address => mapping(address => bool)) public isDsa; // Pool => DSA address => true/false
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -113,7 +114,7 @@ contract Registry {
     emit LogSwitchPool(_pool, isPool[_pool]);
   }
 
-  function updatePoolCap(address _pool, uint _newCap) external isChief {
+  function updatePoolCap(address _pool, uint _newCap) external isMaster {
     require(isPool[_pool], "not-pool");
     poolCap[_pool] = _newCap;
     emit LogUpdatePoolCap(_pool, _newCap);
@@ -126,11 +127,20 @@ contract Registry {
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
-  function updateInsureFee(address _pool, uint _newFee) external isChief {
+  function updateInsureFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newFee < 10 ** 18, "insure-fee-limit-reached");
     insureFee[_pool] = _newFee;
     emit LogUpdateInsureFee(_pool, _newFee);
+  }
+
+  function enableDsa(address _pool, address _dsa) external isMaster {
+    require(isPool[_pool], "not-pool");
+    isDsa[_pool][_dsa] = true;
+  }
+
+  function disableDsa(address _pool, address _dsa) external isMaster {
+    delete isDsa[_pool][_dsa];
   }
 
   constructor(address _chief) public {

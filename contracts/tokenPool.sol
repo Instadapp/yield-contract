@@ -23,6 +23,7 @@ interface RegistryInterface {
   function poolLogic(address) external returns (address);
   function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
+  function isDsa(address, address) external view returns (bool);
 }
 
 interface RateInterface {
@@ -43,7 +44,6 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
     RegistryInterface public immutable registry; // Pool Registry
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
-    AccountInterface public immutable dsa; // Pool's DSA account
 
     uint private tokenBalance; // total token balance since last rebalancing
     uint public exchangeRate = 10 ** 18; // initial 1 token = 1
@@ -53,13 +53,10 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         address _registry,
         string memory _name,
         string memory _symbol,
-        address _baseToken,
-        address _origin
+        address _baseToken
     ) public ERC20(_name, _symbol) {
         baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
-        address _dsa = instaIndex.build(address(this), 1, _origin);
-        dsa = AccountInterface(_dsa);
     }
 
     modifier isChief() {
@@ -67,8 +64,9 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _;
     }
 
-    function deploy(uint amount) public isChief {
-      baseToken.safeTransfer(address(dsa), amount);
+    function deploy(address _dsa, uint amount) public isChief {
+      require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+      baseToken.safeTransfer(_dsa, amount);
       emit LogDeploy(amount);
     }
 
@@ -93,9 +91,10 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
-    function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
+    function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
+      require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
       if (_targets.length > 0 && _datas.length > 0) {
-        dsa.cast(_targets, _datas, _origin);
+        AccountInterface(_dsa).cast(_targets, _datas, _origin);
       }
       setExchangeRate();
       emit LogSettle(block.timestamp);

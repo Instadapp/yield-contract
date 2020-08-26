@@ -23,6 +23,7 @@ interface RegistryInterface {
   function poolLogic(address) external returns (address);
   function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
+  function isDsa(address, address) external view returns (bool);
 }
 
 interface RateInterface {
@@ -40,7 +41,6 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   RegistryInterface public immutable registry; // Pool Registry
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
-  AccountInterface public immutable dsa; // Pool's DSA account
 
   IERC20 public immutable baseToken; // Base token.
   uint private tokenBalance; // total token balance since last rebalancing
@@ -57,7 +57,6 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     baseToken = IERC20(_baseToken);
     registry = RegistryInterface(_registry);
     address _dsa = instaIndex.build(address(this), 1, _origin);
-    dsa = AccountInterface(_dsa);
   }
 
   modifier isChief() {
@@ -65,8 +64,9 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     _;
   }
 
-  function deploy(uint amount) external isChief {
-    payable(address(dsa)).transfer(amount);
+  function deploy(address _dsa, uint amount) external isChief {
+    require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+    payable(_dsa).transfer(amount);
     emit LogDeploy(amount);
   }
 
@@ -91,9 +91,10 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
   }
 
-  function settle(address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
+  function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
+    require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
     if (_targets.length > 0 && _datas.length > 0) {
-      dsa.cast(_targets, _datas, _origin);
+      AccountInterface(_dsa).cast(_targets, _datas, _origin);
     }
     setExchangeRate();
 
