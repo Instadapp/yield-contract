@@ -80,9 +80,10 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         insuranceAmt = sub(insuranceAmt, difTkn);
         _currentRate = _previousRate;
       } else {
+        uint fee = registry.insureFee(address(this));
         uint difRate = _currentRate - _previousRate;
-        uint insureFee = wmul(difRate, registry.insureFee(address(this)));
-        uint insureFeeAmt = wmul(_totalToken, insureFee);
+        uint insureFee = wmul(difRate, fee);
+        uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), fee);
         insuranceAmt = add(insuranceAmt, insureFeeAmt);
         _currentRate = sub(_currentRate, insureFee);
         tokenBalance = sub(_totalToken, insuranceAmt);
