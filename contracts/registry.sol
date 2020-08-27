@@ -137,9 +137,11 @@ contract Registry {
     emit LogUpdateInsureFee(_pool, _newFee);
   }
 
-  function addDsa(address _pool) external isMaster {
+  function addDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
-    address _dsa = instaIndex.build(_pool, 1, address(this));
+    if (_dsa == address(0)) {
+      _dsa = instaIndex.build(_pool, 1, address(this));
+    }
     isDsa[_pool][_dsa] = true;
     emit LogNewDSA(_pool, _dsa);
   }
