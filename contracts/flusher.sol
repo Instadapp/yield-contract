@@ -45,6 +45,8 @@ contract Flusher {
     require(address(token) != address(0), "invalid-token");
 
     address poolToken = registry.poolToken(token);
+    require(poolToken != address(0), "invalid-pool");
+    
     IERC20 tokenContract = IERC20(token);
 
     YieldPool poolContract = YieldPool(poolToken);
