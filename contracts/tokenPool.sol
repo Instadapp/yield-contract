@@ -61,7 +61,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
 
     uint private tokenBalance; // total token balance since last rebalancing
-    uint public exchangeRate = 10 ** 18; // initial 1 token = 1
+    uint public exchangeRate; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
 
     constructor(
@@ -73,6 +73,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         baseToken = IERC20(_baseToken);
         baseDecimal = ERC20(_baseToken).decimals();
         registry = RegistryInterface(_registry);
+        exchangeRate = 10 ** uint(36 - ERC20(_baseToken).decimals());
     }
 
     modifier isChief() {
