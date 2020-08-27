@@ -85,8 +85,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
       insuranceAmt = sub(insuranceAmt, difTkn);
       _currentRate = _previousRate;
     } else {
-      uint fee = registry.insureFee(address(this));
-      uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), fee);
+      uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
       insuranceAmt = add(insuranceAmt, insureFeeAmt);
       tokenBalance = sub(_totalToken, insureFeeAmt);
       _currentRate = wdiv(totalSupply(), tokenBalance);
