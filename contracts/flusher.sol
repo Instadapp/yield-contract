@@ -46,26 +46,20 @@ contract Flusher {
 
     address poolToken = registry.poolToken(token);
     IERC20 tokenContract = IERC20(token);
-    
-    if (poolToken != address(0)) {
-      YieldPool poolContract = YieldPool(poolToken);
-      uint amt;
-      if (address(tokenContract) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-        amt = address(this).balance;
-        poolContract.deposit{value: amt}(amt);
-      } else {
-        amt = tokenContract.balanceOf(address(this));
-        if (tokenContract.allowance(address(this), address(poolContract)) == 0)
-          tokenContract.approve(address(poolContract), uint(-1));
 
-        poolContract.deposit(amt);
-      }
-      emit LogDeposit(msg.sender, token, address(poolContract), amt);
+    YieldPool poolContract = YieldPool(poolToken);
+    uint amt;
+    if (address(tokenContract) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+      amt = address(this).balance;
+      poolContract.deposit{value: amt}(amt);
     } else {
-      uint amt = tokenContract.balanceOf(address(this));
-      tokenContract.safeTransfer(owner, amt);
-      emit LogWithdrawToOwner(token, owner, amt);
+      amt = tokenContract.balanceOf(address(this));
+      if (tokenContract.allowance(address(this), address(poolContract)) == 0)
+        tokenContract.approve(address(poolContract), uint(-1));
+
+      poolContract.deposit(amt);
     }
+    emit LogDeposit(msg.sender, token, address(poolContract), amt);
   }
 
   function withdraw(address token, uint amount) external isSigner returns (uint _amount) {
