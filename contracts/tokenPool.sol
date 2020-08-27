@@ -31,6 +31,20 @@ interface RateInterface {
 }
 
 contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
+    function convert36To18(uint _dec, uint256 _amt) public pure returns (uint256 amt) {
+        amt = (_amt / 10 ** (18 - _dec));
+    }
+
+    function convert18To36(uint _dec, uint256 _amt) public pure returns (uint256 amt) {
+        amt = mul(_amt, 10 ** (18 - _dec));
+    }
+
+    function convertDecTo18(uint _dec, uint256 _amt) internal pure returns (uint256 amt) {
+        amt = mul(_amt, 10 ** (18 - _dec));
+    }
+
+
+
     using SafeERC20 for IERC20;
 
     event LogDeploy(uint amount);
@@ -42,6 +56,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogPausePool(bool);
 
     IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
+    uint256 public immutable baseDecimal; // Base token. Eg:- DAI, USDC, etc.
     RegistryInterface public immutable registry; // Pool Registry
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
 
@@ -56,6 +71,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         address _baseToken
     ) public ERC20(_name, _symbol) {
         baseToken = IERC20(_baseToken);
+        baseDecimal = ERC20(_baseToken).decimals();
         registry = RegistryInterface(_registry);
     }
 
@@ -71,12 +87,11 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     }
 
     function setExchangeRate() public isChief {
-      uint _previousRate = exchangeRate;
+      uint _previousRate = convert36To18(baseDecimal, exchangeRate);
       uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-      uint _currentRate = wdiv(_totalToken, totalSupply());
+      uint _currentRate = convertDecTo18(baseDecimal, wdiv(_totalToken, totalSupply()));
       if (_currentRate < _previousRate) {
-        uint difRate = _previousRate - _currentRate;
-        uint difTkn = wmul(_totalToken, difRate);
+        uint difTkn = sub(tokenBalance, _totalToken);
         insuranceAmt = sub(insuranceAmt, difTkn);
         _currentRate = _previousRate;
       } else {
@@ -88,7 +103,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _currentRate = sub(_currentRate, insureFee);
         tokenBalance = sub(_totalToken, insuranceAmt);
       }
-      exchangeRate = _currentRate;
+      exchangeRate = convert18To36(baseDecimal, _currentRate);
       emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
