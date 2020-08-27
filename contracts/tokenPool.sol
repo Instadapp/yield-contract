@@ -10,6 +10,7 @@ import { DSMath } from "./libs/safeMath.sol";
 
 interface AccountInterface {
   function enable(address authority) external;
+  function isAuth(address) external view returns(bool);
   function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
 }
 
@@ -66,7 +67,9 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     function deploy(address _dsa, uint amount) public isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+      require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");  
       baseToken.safeTransfer(_dsa, amount);
+
       emit LogDeploy(amount);
     }
 
@@ -93,9 +96,12 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+      AccountInterface dsaWallet = AccountInterface(_dsa);
       if (_targets.length > 0 && _datas.length > 0) {
-        AccountInterface(_dsa).cast(_targets, _datas, _origin);
+        dsaWallet.cast(_targets, _datas, _origin);
       }
+      require(dsaWallet.isAuth(address(this)), "token-pool-not-auth"); 
+ 
       setExchangeRate();
       emit LogSettle(block.timestamp);
     }
