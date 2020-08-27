@@ -5,6 +5,7 @@ pragma experimental ABIEncoderV2;
 
 interface IndexInterface {
   function master() external view returns (address);
+  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 contract Registry {
@@ -13,12 +14,14 @@ contract Registry {
   event LogRemoveChief(address indexed chief);
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
-  event LogSwitchPool(address pool, bool);
+  event LogSwitchPool(address pool, bool poolState);
   event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
+  event LogNewDSA(address indexed pool, address indexed dsa);
+  event LogRemoveDSA(address indexed pool, address indexed dsa);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
@@ -134,13 +137,20 @@ contract Registry {
     emit LogUpdateInsureFee(_pool, _newFee);
   }
 
-  function enableDsa(address _pool, address _dsa) external isMaster {
+  function addDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
+    if (_dsa == address(0)) {
+      _dsa = instaIndex.build(_pool, 1, address(this));
+    }
     isDsa[_pool][_dsa] = true;
+    emit LogNewDSA(_pool, _dsa);
   }
 
-  function disableDsa(address _pool, address _dsa) external isMaster {
+  function removeDsa(address _pool, address _dsa) external isMaster {
+    require(isPool[_pool], "not-pool");
+    require(isDsa[_pool][_dsa], "not-dsa-for-pool");
     delete isDsa[_pool][_dsa];
+    emit LogRemoveDSA(_pool, _dsa);
   }
 
   constructor(address _chief) public {
