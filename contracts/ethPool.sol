@@ -67,11 +67,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
     if (token == address(0)) {
-        payable(_dsa).transfer(amount);
-      } else {
-        IERC20(token).safeTransfer(_dsa, amount);
-      }
-      emit LogDeploy(token, amount);
+      payable(_dsa).transfer(amount);
+    } else {
+      IERC20(token).safeTransfer(_dsa, amount);
+    }
+    emit LogDeploy(token, amount);
   }
 
   function setExchangeRate() public isChief {
