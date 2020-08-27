@@ -91,6 +91,8 @@ contract Flusher {
 
   function setBasic(address newOwner, address token) external {
     require(owner == address(0), "already-an-owner");
+    require(newOwner != address(0), "not-vaild-owner-address");
+    require(token != address(0), "not-vaild-token-address");
     owner = payable(newOwner);
     deposit(token);
     emit LogInit(newOwner);
