@@ -74,7 +74,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     function setExchangeRate() public isChief {
       uint _previousRate = exchangeRate;
       uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-      // should we add totalToken - insurance here or keep it on logic contract?
+      _totalToken = sub(_totalToken, insuranceAmt);
       uint _currentRate = wdiv(totalSupply(), _totalToken);
       if (_currentRate > _previousRate) {
         uint difTkn = sub(tokenBalance, _totalToken);
@@ -143,4 +143,6 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       require(msg.sender == instaIndex.master(), "not-master");
       paused() ? _unpause() : _pause();
     }
+
+    receive() external payable {}
 }

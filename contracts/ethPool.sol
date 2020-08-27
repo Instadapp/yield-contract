@@ -51,12 +51,10 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     address _registry,
     string memory _name,
     string memory _symbol,
-    address _baseToken,
-    address _origin
+    address _baseToken
   ) public ERC20(_name, _symbol) {
     baseToken = IERC20(_baseToken);
     registry = RegistryInterface(_registry);
-    address _dsa = instaIndex.build(address(this), 1, _origin);
   }
 
   modifier isChief() {
@@ -73,19 +71,18 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-    uint _currentRate = wdiv(_totalToken, totalSupply());
-    if (_currentRate < _previousRate) {
-      uint difRate = _previousRate - _currentRate;
-      uint difTkn = wmul(_totalToken, difRate);
+    _totalToken = sub(_totalToken, insuranceAmt);
+    uint _currentRate = wdiv(totalSupply(), _totalToken);
+    if (_currentRate > _previousRate) {
+      uint difTkn = sub(tokenBalance, _totalToken);
       insuranceAmt = sub(insuranceAmt, difTkn);
       _currentRate = _previousRate;
     } else {
-      uint difRate = _currentRate - _previousRate;
-      uint insureFee = wmul(difRate, registry.insureFee(address(this)));
-      uint insureFeeAmt = wmul(_totalToken, insureFee);
+      uint fee = registry.insureFee(address(this));
+      uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), fee);
       insuranceAmt = add(insuranceAmt, insureFeeAmt);
-      _currentRate = sub(_currentRate, insureFee);
-      tokenBalance = sub(_totalToken, insuranceAmt);
+      tokenBalance = sub(_totalToken, insureFeeAmt);
+      _currentRate = wdiv(totalSupply(), tokenBalance);
     }
     exchangeRate = _currentRate;
     emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
@@ -106,7 +103,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _newTokenBal = add(tokenBalance, msg.value);
     require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
-    uint _mintAmt = wdiv(msg.value, exchangeRate);
+    uint _mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, _mintAmt);
 
     emit LogDeposit(tknAmt, _mintAmt);
@@ -116,14 +113,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint poolBal = address(this).balance;
     require(tknAmt <= poolBal, "not-enough-liquidity-available");
     uint _bal = balanceOf(msg.sender);
-    uint _tknBal = wmul(_bal, exchangeRate);
+    uint _tknBal = wdiv(_bal, exchangeRate);
     uint _burnAmt;
     if (tknAmt == uint(-1)) {
       _burnAmt = _bal;
-      _tknAmt = wmul(_burnAmt, exchangeRate);
+      _tknAmt = wdiv(_burnAmt, exchangeRate);
     } else {
       require(tknAmt <= _tknBal, "balance-exceeded");
-      _burnAmt = wdiv(tknAmt, exchangeRate);
+      _burnAmt = wmul(tknAmt, exchangeRate);
       _tknAmt = tknAmt;
     }
 
