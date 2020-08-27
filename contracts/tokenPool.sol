@@ -34,7 +34,7 @@ interface RateInterface {
 contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     using SafeERC20 for IERC20;
 
-    event LogDeploy(uint amount);
+    event LogDeploy(address token, uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleTime);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
@@ -47,7 +47,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
 
     uint private tokenBalance; // total token balance since last rebalancing
-    uint public exchangeRate = 10 ** 18; // initial 1 token = 1
+    uint public exchangeRate; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
 
     constructor(
@@ -58,6 +58,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     ) public ERC20(_name, _symbol) {
         baseToken = IERC20(_baseToken);
         registry = RegistryInterface(_registry);
+        exchangeRate = 10 ** uint(36 - ERC20(_baseToken).decimals());
     }
 
     modifier isChief() {
@@ -65,30 +66,34 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _;
     }
 
-    function deploy(address _dsa, uint amount) public isChief {
+    function deploy(address _dsa, address token, uint amount) public isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
       require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");  
-      baseToken.safeTransfer(_dsa, amount);
-
-      emit LogDeploy(amount);
+      if (token == address(0)) {
+        baseToken.safeTransfer(_dsa, amount);
+      } else if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE){
+        payable(_dsa).transfer(amount);
+      } else {
+        IERC20(token).safeTransfer(_dsa, amount);
+      }
+      emit LogDeploy(token, amount);
     }
 
     function setExchangeRate() public isChief {
       uint _previousRate = exchangeRate;
       uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-      uint _currentRate = wdiv(_totalToken, totalSupply());
-      if (_currentRate < _previousRate) {
-        uint difRate = _previousRate - _currentRate;
-        uint difTkn = wmul(_totalToken, difRate);
+      _totalToken = sub(_totalToken, insuranceAmt);
+      uint _currentRate = wdiv(totalSupply(), _totalToken);
+      require(_currentRate != 0, "currentRate-is-0");
+      if (_currentRate > _previousRate) {
+        uint difTkn = sub(tokenBalance, _totalToken);
         insuranceAmt = sub(insuranceAmt, difTkn);
         _currentRate = _previousRate;
       } else {
-        uint difRate = _currentRate - _previousRate;
-        uint insureFee = wmul(difRate, registry.insureFee(address(this)));
-        uint insureFeeAmt = wmul(_totalToken, insureFee);
+        uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
         insuranceAmt = add(insuranceAmt, insureFeeAmt);
-        _currentRate = sub(_currentRate, insureFee);
-        tokenBalance = sub(_totalToken, insuranceAmt);
+        tokenBalance = sub(_totalToken, insureFeeAmt);
+        _currentRate = wdiv(totalSupply(), tokenBalance);
       }
       exchangeRate = _currentRate;
       emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
@@ -111,7 +116,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-      uint _mintAmt = wdiv(tknAmt, exchangeRate);
+      uint _mintAmt = wmul(tknAmt, exchangeRate);
       _mint(msg.sender, _mintAmt);
 
       emit LogDeposit(tknAmt, _mintAmt);
@@ -121,14 +126,14 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       uint poolBal = baseToken.balanceOf(address(this));
       require(tknAmt <= poolBal, "not-enough-liquidity-available");
       uint _bal = balanceOf(msg.sender);
-      uint _tknBal = wmul(_bal, exchangeRate);
+      uint _tknBal = wdiv(_bal, exchangeRate);
       uint _burnAmt;
       if (tknAmt == uint(-1)) {
         _burnAmt = _bal;
-        _tknAmt = wmul(_burnAmt, exchangeRate);
+        _tknAmt = wdiv(_burnAmt, exchangeRate);
       } else {
         require(tknAmt <= _tknBal, "balance-exceeded");
-        _burnAmt = wdiv(tknAmt, exchangeRate);
+        _burnAmt = wmul(tknAmt, exchangeRate);
         _tknAmt = tknAmt;
       }
 
@@ -149,4 +154,6 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       require(msg.sender == instaIndex.master(), "not-master");
       paused() ? _unpause() : _pause();
     }
+
+    receive() external payable {}
 }

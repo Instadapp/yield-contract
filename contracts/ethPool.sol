@@ -2,7 +2,7 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -31,7 +31,9 @@ interface RateInterface {
 }
 
 contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
-  event LogDeploy(uint amount);
+  using SafeERC20 for IERC20;
+
+  event LogDeploy(address indexed token, uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleTime);
   event LogDeposit(uint depositAmt, uint poolMintAmt);
@@ -51,12 +53,10 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     address _registry,
     string memory _name,
     string memory _symbol,
-    address _baseToken,
-    address _origin
+    address _baseToken
   ) public ERC20(_name, _symbol) {
     baseToken = IERC20(_baseToken);
     registry = RegistryInterface(_registry);
-    address _dsa = instaIndex.build(address(this), 1, _origin);
   }
 
   modifier isChief() {
@@ -64,28 +64,31 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     _;
   }
 
-  function deploy(address _dsa, uint amount) external isChief {
+  function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
-    payable(_dsa).transfer(amount);
-    emit LogDeploy(amount);
+    if (token == address(0)) {
+      payable(_dsa).transfer(amount);
+    } else {
+      IERC20(token).safeTransfer(_dsa, amount);
+    }
+    emit LogDeploy(token, amount);
   }
 
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-    uint _currentRate = wdiv(_totalToken, totalSupply());
-    if (_currentRate < _previousRate) {
-      uint difRate = _previousRate - _currentRate;
-      uint difTkn = wmul(_totalToken, difRate);
+    _totalToken = sub(_totalToken, insuranceAmt);
+    uint _currentRate = wdiv(totalSupply(), _totalToken);
+    require(_currentRate != 0, "currentRate-is-0");
+    if (_currentRate > _previousRate) {
+      uint difTkn = sub(tokenBalance, _totalToken);
       insuranceAmt = sub(insuranceAmt, difTkn);
       _currentRate = _previousRate;
     } else {
-      uint difRate = _currentRate - _previousRate;
-      uint insureFee = wmul(difRate, registry.insureFee(address(this)));
-      uint insureFeeAmt = wmul(_totalToken, insureFee);
+      uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
       insuranceAmt = add(insuranceAmt, insureFeeAmt);
-      _currentRate = sub(_currentRate, insureFee);
-      tokenBalance = sub(_totalToken, insuranceAmt);
+      tokenBalance = sub(_totalToken, insureFeeAmt);
+      _currentRate = wdiv(totalSupply(), tokenBalance);
     }
     exchangeRate = _currentRate;
     emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
@@ -106,7 +109,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _newTokenBal = add(tokenBalance, msg.value);
     require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
-    uint _mintAmt = wdiv(msg.value, exchangeRate);
+    uint _mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, _mintAmt);
 
     emit LogDeposit(tknAmt, _mintAmt);
@@ -116,14 +119,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint poolBal = address(this).balance;
     require(tknAmt <= poolBal, "not-enough-liquidity-available");
     uint _bal = balanceOf(msg.sender);
-    uint _tknBal = wmul(_bal, exchangeRate);
+    uint _tknBal = wdiv(_bal, exchangeRate);
     uint _burnAmt;
     if (tknAmt == uint(-1)) {
       _burnAmt = _bal;
-      _tknAmt = wmul(_burnAmt, exchangeRate);
+      _tknAmt = wdiv(_burnAmt, exchangeRate);
     } else {
       require(tknAmt <= _tknBal, "balance-exceeded");
-      _burnAmt = wdiv(tknAmt, exchangeRate);
+      _burnAmt = wmul(tknAmt, exchangeRate);
       _tknAmt = tknAmt;
     }
 
