@@ -33,6 +33,7 @@ contract Registry {
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
   mapping (address => mapping(address => bool)) public isDsa; // Pool => DSA address => true/false
+  mapping (address => address[]) public dsaArr; // Pool => all dsa in array
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -143,6 +144,8 @@ contract Registry {
       _dsa = instaIndex.build(_pool, 1, address(this));
     }
     isDsa[_pool][_dsa] = true;
+
+    dsaArr[_pool].push(_dsa);
     emit LogNewDSA(_pool, _dsa);
   }
 
