@@ -45,6 +45,10 @@ contract Registry {
     _;
   }
 
+  function getDsaLength(address _pool) external view returns(uint) {
+    return dsaArr[_pool].length;
+  }
+
   /**
     * @dev Enable New Chief.
     * @param _chief Address of the new chief.
