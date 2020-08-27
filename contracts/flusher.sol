@@ -59,7 +59,7 @@ contract Flusher {
 
       poolContract.deposit(amt);
     }
-    emit LogDeposit(msg.sender, token, address(poolContract), amt);
+    emit LogDeposit(token, address(poolContract), amt);
   }
 
   function withdraw(address token, uint amount) external isSigner returns (uint _amount) {
