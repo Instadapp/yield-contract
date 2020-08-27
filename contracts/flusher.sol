@@ -37,53 +37,31 @@ contract Flusher {
 
   event LogInit(address indexed owner);
   event LogSwitch(bool indexed shieldState);
-
-  event LogDeposit(
-    address indexed caller,
-    address indexed token,
-    address indexed tokenPool,
-    uint amount
-  );
-
-  event LogWithdraw(
-    address indexed caller,
-    address indexed token,
-    address indexed tokenPool,
-    uint amount
-  );
-
-  event LogWithdrawToOwner(
-    address indexed caller,
-    address indexed token,
-    address indexed owner,
-    uint amount
-  );
+  event LogDeposit(address indexed token, address indexed tokenPool, uint amount);
+  event LogWithdraw(address indexed token, address indexed tokenPool,uint amount);
+  event LogWithdrawToOwner(address indexed token, address indexed owner, uint amount);
 
   function deposit(address token) public payable isSigner {
     require(address(token) != address(0), "invalid-token");
 
     address poolToken = registry.poolToken(token);
-    IERC20 tokenContract = IERC20(token);
+    require(poolToken != address(0), "invalid-pool");
     
-    if (poolToken != address(0)) {
-      YieldPool poolContract = YieldPool(poolToken);
-      uint amt;
-      if (address(tokenContract) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
-        amt = address(this).balance;
-        poolContract.deposit{value: amt}(amt);
-      } else {
-        amt = tokenContract.balanceOf(address(this));
-        if (tokenContract.allowance(address(this), address(poolContract)) == 0)
-          tokenContract.approve(address(poolContract), uint(-1));
+    IERC20 tokenContract = IERC20(token);
 
-        poolContract.deposit(amt);
-      }
-      emit LogDeposit(msg.sender, token, address(poolContract), amt);
+    YieldPool poolContract = YieldPool(poolToken);
+    uint amt;
+    if (address(tokenContract) == address(0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE)) {
+      amt = address(this).balance;
+      poolContract.deposit{value: amt}(amt);
     } else {
-      uint amt = tokenContract.balanceOf(address(this));
-      tokenContract.safeTransfer(owner, amt);
-      emit LogWithdrawToOwner(msg.sender, token, owner, amt);
+      amt = tokenContract.balanceOf(address(this));
+      if (tokenContract.allowance(address(this), address(poolContract)) == 0)
+        tokenContract.approve(address(poolContract), uint(-1));
+
+      poolContract.deposit(amt);
     }
+    emit LogDeposit(token, address(poolContract), amt);
   }
 
   function withdraw(address token, uint amount) external isSigner returns (uint _amount) {
@@ -92,7 +70,7 @@ contract Flusher {
     require(poolToken != address(0), "invalid-pool");
     
     _amount = YieldPool(poolToken).withdraw(amount, owner);
-    emit LogWithdraw(msg.sender, token, poolToken, _amount);
+    emit LogWithdraw(token, poolToken, _amount);
   }
 
   /**
@@ -110,11 +88,13 @@ contract Flusher {
       amount = tokenContract.balanceOf(address(this));
       tokenContract.safeTransfer(address(owner), amount);
     }
-    emit LogWithdrawToOwner(msg.sender, token, owner, amount);
+    emit LogWithdrawToOwner(token, owner, amount);
   }
 
   function setBasic(address newOwner, address token) external {
     require(owner == address(0), "already-an-owner");
+    require(newOwner != address(0), "not-vaild-owner-address");
+    require(token != address(0), "not-vaild-token-address");
     owner = payable(newOwner);
     deposit(token);
     emit LogInit(newOwner);
