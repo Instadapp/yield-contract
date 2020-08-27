@@ -116,6 +116,7 @@ contract Flusher {
     require(_target != address(0), "target-invalid");
     require(_data.length > 0, "data-invalid");
     bytes memory _callData = _data;
+    address _owner = owner;
     assembly {
       let succeeded := delegatecall(gas(), _target, add(_callData, 0x20), mload(_callData), 0, 0)
       switch iszero(succeeded)
@@ -126,6 +127,7 @@ contract Flusher {
         revert(0x00, size)
       }
     }
+    require(_owner == owner, "owner-change-denied");
   }
 
   receive() external payable {}
