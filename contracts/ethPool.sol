@@ -2,7 +2,7 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -31,7 +31,9 @@ interface RateInterface {
 }
 
 contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
-  event LogDeploy(uint amount);
+  using SafeERC20 for IERC20;
+
+  event LogDeploy(address indexed token, uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleTime);
   event LogDeposit(uint depositAmt, uint poolMintAmt);
@@ -62,10 +64,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     _;
   }
 
-  function deploy(address _dsa, uint amount) external isChief {
+  function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
-    payable(_dsa).transfer(amount);
-    emit LogDeploy(amount);
+    if (token == address(0)) {
+        payable(_dsa).transfer(amount);
+      } else {
+        IERC20(token).safeTransfer(_dsa, amount);
+      }
+      emit LogDeploy(token, amount);
   }
 
   function setExchangeRate() public isChief {
@@ -73,6 +79,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, insuranceAmt);
     uint _currentRate = wdiv(totalSupply(), _totalToken);
+    require(_currentRate != 0, "currentRate-is-0");
     if (_currentRate > _previousRate) {
       uint difTkn = sub(tokenBalance, _totalToken);
       insuranceAmt = sub(insuranceAmt, difTkn);

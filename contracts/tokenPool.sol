@@ -33,7 +33,7 @@ interface RateInterface {
 contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     using SafeERC20 for IERC20;
 
-    event LogDeploy(uint amount);
+    event LogDeploy(address token, uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleTime);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
@@ -65,10 +65,16 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _;
     }
 
-    function deploy(address _dsa, uint amount) public isChief {
+    function deploy(address _dsa, address token, uint amount) public isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
-      baseToken.safeTransfer(_dsa, amount);
-      emit LogDeploy(amount);
+      if (token == address(0)) {
+        baseToken.safeTransfer(_dsa, amount);
+      } else if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE){
+        payable(_dsa).transfer(amount);
+      } else {
+        IERC20(token).safeTransfer(_dsa, amount);
+      }
+      emit LogDeploy(token, amount);
     }
 
     function setExchangeRate() public isChief {
@@ -76,13 +82,13 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
       _totalToken = sub(_totalToken, insuranceAmt);
       uint _currentRate = wdiv(totalSupply(), _totalToken);
+      require(_currentRate != 0, "currentRate-is-0");
       if (_currentRate > _previousRate) {
         uint difTkn = sub(tokenBalance, _totalToken);
         insuranceAmt = sub(insuranceAmt, difTkn);
         _currentRate = _previousRate;
       } else {
-        uint fee = registry.insureFee(address(this));
-        uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), fee);
+        uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
         insuranceAmt = add(insuranceAmt, insureFeeAmt);
         tokenBalance = sub(_totalToken, insureFeeAmt);
         _currentRate = wdiv(totalSupply(), tokenBalance);
