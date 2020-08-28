@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-import { DSMath } from "./libs/safeMath.sol";
+import { DSMath } from "../libs/safeMath.sol";
 
 interface AccountInterface {
   function enable(address authority) external;
