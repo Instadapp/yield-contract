@@ -128,7 +128,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _burnAmt;
     if (tknAmt == uint(-1)) {
       _burnAmt = _bal;
-      _tknAmt = wdiv(_burnAmt, exchangeRate);
+      _tknAmt = _tknBal;
     } else {
       require(tknAmt <= _tknBal, "balance-exceeded");
       _burnAmt = wmul(tknAmt, exchangeRate);
