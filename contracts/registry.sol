@@ -124,6 +124,7 @@ contract Registry {
 
   function updatePoolCap(address _pool, uint _newCap) external isMaster {
     require(isPool[_pool], "not-pool");
+    require(poolCap[_pool] != _newCap, "same-pool-cap");
     poolCap[_pool] = _newCap;
     emit LogUpdatePoolCap(_pool, _newCap);
   }
@@ -131,6 +132,7 @@ contract Registry {
   function updatePoolLogic(address _pool, address _newLogic) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newLogic != address(0), "invalid-address");
+    require( poolLogic[_pool] != _newLogic, "same-pool-logic");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
@@ -138,6 +140,7 @@ contract Registry {
   function updateInsureFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newFee < 10 ** 18, "insure-fee-limit-reached");
+    require(insureFee[_pool] != _newFee, "same-pool-fee");
     insureFee[_pool] = _newFee;
     emit LogUpdateInsureFee(_pool, _newFee);
   }
