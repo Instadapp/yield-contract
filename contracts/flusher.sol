@@ -41,7 +41,7 @@ contract Flusher {
   event LogWithdraw(address indexed token, address indexed tokenPool,uint amount);
   event LogWithdrawToOwner(address indexed token, address indexed owner, uint amount);
 
-  function deposit(address token) public payable isSigner {
+  function _deposit(address token) internal {
     require(address(token) != address(0), "invalid-token");
 
     address poolToken = registry.poolToken(token);
@@ -62,6 +62,10 @@ contract Flusher {
       poolContract.deposit(amt);
     }
     emit LogDeposit(token, address(poolContract), amt);
+  }
+
+  function deposit(address token) external payable isSigner {
+    _deposit(token);
   }
 
   function withdraw(address token, uint amount) external isSigner returns (uint _amount) {
@@ -96,7 +100,7 @@ contract Flusher {
     require(newOwner != address(0), "not-vaild-owner-address");
     require(token != address(0), "not-vaild-token-address");
     owner = payable(newOwner);
-    deposit(token);
+    _deposit(token);
     emit LogInit(newOwner);
   }
 
