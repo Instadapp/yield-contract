@@ -7,12 +7,7 @@ interface IProxy {
 
 contract Deployer {
 
-  event LogNewProxy(
-    address indexed owner,
-    address indexed proxy,
-    address indexed logic,
-    address token
-  );
+  event LogNewProxy(address indexed owner, address indexed logic, address indexed token);
 
   /**
     * @dev deploy create2 + minimal proxy
@@ -38,7 +33,7 @@ contract Deployer {
         proxy := create2(0, clone, 0x37, salt)
     }
     IProxy(proxy).setBasic(owner, token);
-    emit LogNewProxy(owner, proxy, logic, token);
+    emit LogNewProxy(owner, logic, token);
   }
 
   /**
