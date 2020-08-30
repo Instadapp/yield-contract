@@ -39,6 +39,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogDeposit(uint depositAmt, uint poolMintAmt);
   event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
   event LogAddInsurance(uint amount);
+  event LogWithdrawInsurance(uint amount);
   event LogPausePool(bool);
 
   RegistryInterface public immutable registry; // Pool Registry
@@ -123,11 +124,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogSettle(block.number);
   }
 
-  function deposit(uint tknAmt) public whenNotPaused payable returns(uint) {
+  function deposit(uint tknAmt) public whenNotPaused payable returns (uint _mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     tokenBalance = add(tokenBalance, tknAmt);
 
-    uint _mintAmt = wmul(msg.value, exchangeRate);
+    _mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, _mintAmt);
 
     emit LogDeposit(tknAmt, _mintAmt);
@@ -167,21 +168,16 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   function addInsurance(uint tknAmt) external payable {
     require(tknAmt == msg.value, "unmatched-amount");
-    insuranceAmt += tknAmt;
+    insuranceAmt = add(insuranceAmt, tknAmt);
     emit LogAddInsurance(tknAmt);
   }
 
   function withdrawInsurance(uint tknAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
-    require(tknAmt <= insuranceAmt || tknAmt == uint(-1), "not-enough-insurance");
-    if (tknAmt == uint(-1)) {
-      msg.sender.transfer(insuranceAmt);
-      insuranceAmt = 0;
-    } else {
-      msg.sender.transfer(tknAmt);
-      insuranceAmt = sub(insuranceAmt, tknAmt);
-    }
-    emit LogAddInsurance(tknAmt);
+    require(tknAmt <= insuranceAmt, "not-enough-insurance");
+    msg.sender.transfer(tknAmt);
+    insuranceAmt = sub(insuranceAmt, tknAmt);
+    emit LogWithdrawInsurance(tknAmt);
   }
 
   function shutdown() external {

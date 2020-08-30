@@ -126,11 +126,12 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogSettle(block.number);
     }
 
-    function deposit(uint tknAmt) external whenNotPaused payable returns(uint) {
+    function deposit(uint tknAmt) external whenNotPaused payable returns (uint _mintAmt) {
+      require(msg.value == 0, "non-eth-pool");
       tokenBalance = add(tokenBalance, tknAmt);
 
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-      uint _mintAmt = wmul(tknAmt, exchangeRate);
+      _mintAmt = wmul(tknAmt, exchangeRate);
       _mint(msg.sender, _mintAmt);
 
       emit LogDeposit(tknAmt, _mintAmt);
@@ -176,14 +177,9 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     function withdrawInsurance(uint tknAmt) external {
       require(msg.sender == instaIndex.master(), "not-master");
-      require(tknAmt <= insuranceAmt || tknAmt == uint(-1), "not-enough-insurance");
-      if (tknAmt == uint(-1)) {
-        baseToken.safeTransfer(msg.sender, insuranceAmt);
-        insuranceAmt = 0;
-      } else {
-        baseToken.safeTransfer(msg.sender, tknAmt);
-        insuranceAmt = sub(insuranceAmt, tknAmt);
-      }
+      require(tknAmt <= insuranceAmt, "not-enough-insurance");
+      baseToken.safeTransfer(msg.sender, tknAmt);
+      insuranceAmt = sub(insuranceAmt, tknAmt);
       emit LogAddInsurance(tknAmt);
     }
 
