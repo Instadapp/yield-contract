@@ -18,6 +18,7 @@ contract Registry {
   event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
+  event LogUpdateWithdrawalFee(address pool, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogNewDSA(address indexed pool, address indexed dsa);
@@ -32,6 +33,7 @@ contract Registry {
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
+  mapping (address => uint) public withdrawalFee;
   mapping (address => mapping(address => bool)) public isDsa; // Pool => DSA address => true/false
   mapping (address => address[]) public dsaArr; // Pool => all dsa in array
 
@@ -143,6 +145,14 @@ contract Registry {
     require(insureFee[_pool] != _newFee, "same-pool-fee");
     insureFee[_pool] = _newFee;
     emit LogUpdateInsureFee(_pool, _newFee);
+  }
+
+  function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
+    require(isPool[_pool], "not-pool");
+    require(_newFee < 5 ** 16, "insure-fee-limit-reached");
+    require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
+    withdrawalFee[_pool] = _newFee;
+    emit LogUpdateWithdrawalFee(_pool, _newFee);
   }
 
   function addDsa(address _pool, address _dsa) external isMaster {

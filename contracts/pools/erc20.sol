@@ -24,6 +24,7 @@ interface RegistryInterface {
   function poolLogic(address) external returns (address);
   function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
+  function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
 }
 
@@ -38,7 +39,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleTime);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
-    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
+    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
     event LogAddInsurance(uint amount);
     event LogPausePool(bool);
 
@@ -144,14 +145,22 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
       _burn(msg.sender, _burnAmt);
 
+      uint _withdrawalFee = registry.withdrawalFee(address(this));
+      uint _feeAmt;
+      if (_withdrawalFee > 0) {
+        _feeAmt = wmul(_tknAmt, _withdrawalFee);
+        insuranceAmt = add(insuranceAmt, _feeAmt);
+        _tknAmt = sub(_tknAmt, _feeAmt);
+      }
+
       baseToken.safeTransfer(to, _tknAmt);
 
-      emit LogWithdraw(tknAmt, _burnAmt);
+      emit LogWithdraw(tknAmt, _burnAmt, _feeAmt);
     }
 
     function addInsurance(uint tknAmt) external payable {
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-      insuranceAmt += tknAmt;
+      insuranceAmt = add(insuranceAmt, tknAmt);
       emit LogAddInsurance(tknAmt);
     }
 
