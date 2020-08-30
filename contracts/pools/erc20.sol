@@ -149,13 +149,13 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogWithdraw(tknAmt, _burnAmt);
     }
 
-    function addInsurance(uint tknAmt) external payable {
+    function addInsurance(uint tknAmt) external {
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
       insuranceAmt += tknAmt;
       emit LogAddInsurance(tknAmt);
     }
 
-    function withdrawInsurance(uint tknAmt) external payable {
+    function withdrawInsurance(uint tknAmt) external {
       require(msg.sender == instaIndex.master(), "not-master");
       require(tknAmt <= insuranceAmt || tknAmt == uint(-1), "not-enough-insurance");
       if (tknAmt == uint(-1)) {
