@@ -90,6 +90,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
           insuranceAmt = sub(insuranceAmt, difTkn);
           _currentRate = _previousRate;
         } else {
+          insuranceAmt = 0;
           tokenBalance = add(_totalToken, insuranceAmt);
           _currentRate = wdiv(totalSupply(), tokenBalance);
         }

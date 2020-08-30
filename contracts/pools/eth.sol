@@ -80,13 +80,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, insuranceAmt);
     uint _currentRate = wdiv(totalSupply(), _totalToken);
-    require(_currentRate != 0, "currentRate-is-0");
+    require(_currentRate != 0, "current-rate-is-zero");
     if (_currentRate > _previousRate) {
-      uint difTkn = sub(tokenBalance, _totalToken);
-      if (difTkn < insuranceAmt) {
-        insuranceAmt = sub(insuranceAmt, difTkn);
+      uint _difTkn = sub(tokenBalance, _totalToken);
+      if (_difTkn < insuranceAmt) {
+        insuranceAmt = sub(insuranceAmt, _difTkn);
         _currentRate = _previousRate;
       } else {
+        insuranceAmt = 0;
         tokenBalance = add(_totalToken, insuranceAmt);
         _currentRate = wdiv(totalSupply(), tokenBalance);
       }
