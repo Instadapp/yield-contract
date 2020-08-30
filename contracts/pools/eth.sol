@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DSMath } from "../libs/safeMath.sol";
 
 interface AccountInterface {
-  function enable(address authority) external;
+  function isAuth(address) external view returns(bool);
   function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
 }
 
@@ -66,6 +66,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+    require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth"); 
     if (token == address(0)) {
       payable(_dsa).transfer(amount);
     } else {
@@ -101,9 +102,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+    AccountInterface dsaWallet = AccountInterface(_dsa);
     if (_targets.length > 0 && _datas.length > 0) {
-      AccountInterface(_dsa).cast(_targets, _datas, _origin);
+      dsaWallet.cast(_targets, _datas, _origin);
     }
+    require(dsaWallet.isAuth(address(this)), "token-pool-not-auth"); 
     setExchangeRate();
 
     emit LogSettle(block.timestamp);
