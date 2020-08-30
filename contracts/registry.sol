@@ -146,7 +146,7 @@ contract Registry {
 
   function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 5 * 10 ** 16, "insure-fee-limit-reached");
+    require(_newFee < 1 * 10 ** 16, "withdrawal-fee-limit-reached");
     require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
     withdrawalFee[_pool] = _newFee;
     emit LogUpdateWithdrawalFee(_pool, _newFee);
@@ -154,11 +154,8 @@ contract Registry {
 
   function addDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
-    if (_dsa == address(0)) {
-      _dsa = instaIndex.build(_pool, 1, address(this));
-    }
+    if (_dsa == address(0)) _dsa = instaIndex.build(_pool, 1, address(this));
     isDsa[_pool][_dsa] = true;
-
     dsaArr[_pool].push(_dsa);
     emit LogNewDSA(_pool, _dsa);
   }
