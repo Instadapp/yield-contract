@@ -149,7 +149,7 @@ contract Registry {
 
   function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 5 ** 16, "insure-fee-limit-reached");
+    require(_newFee < 5 * 10 ** 16, "insure-fee-limit-reached"); // max 5%
     require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
     withdrawalFee[_pool] = _newFee;
     emit LogUpdateWithdrawalFee(_pool, _newFee);
