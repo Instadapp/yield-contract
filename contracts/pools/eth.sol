@@ -75,11 +75,19 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogDeploy(token, amount);
   }
 
+  /**
+  * @dev get pool token rate
+  * @param tokenAmt total token amount
+  */
+  function getCurrentRate(uint tokenAmt) public {
+    return wdiv(totalSupply(), tokenAmt);
+  }
+
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, insuranceAmt);
-    uint _currentRate = wdiv(totalSupply(), _totalToken);
+    uint _currentRate = getCurrentRate(_totalToken);
     require(_currentRate != 0, "current-rate-is-zero");
     if (_currentRate > _previousRate) {
       uint _difTkn = sub(tokenBalance, _totalToken);
@@ -89,13 +97,13 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
       } else {
         insuranceAmt = 0;
         tokenBalance = add(_totalToken, insuranceAmt);
-        _currentRate = wdiv(totalSupply(), tokenBalance);
+        _currentRate = getCurrentRate(tokenBalance);
       }
     } else {
       uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
       insuranceAmt = add(insuranceAmt, insureFeeAmt);
       tokenBalance = sub(_totalToken, insureFeeAmt);
-      _currentRate = wdiv(totalSupply(), tokenBalance);
+      _currentRate = getCurrentRate(tokenBalance);
     }
     exchangeRate = _currentRate;
     emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
