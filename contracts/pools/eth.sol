@@ -79,7 +79,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   * @dev get pool token rate
   * @param tokenAmt total token amount
   */
-  function getCurrentRate(uint tokenAmt) public {
+  function getCurrentRate(uint tokenAmt) public returns (uint) {
     return wdiv(totalSupply(), tokenAmt);
   }
 
