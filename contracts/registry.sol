@@ -15,7 +15,6 @@ contract Registry {
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePool(address pool, bool poolState);
-  event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
   event LogUpdateWithdrawalFee(address pool, uint newFee);
