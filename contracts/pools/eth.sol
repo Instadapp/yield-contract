@@ -76,30 +76,33 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   }
 
   /**
-  * @dev get pool token rate
-  * @param tokenAmt total token amount
-  */
+    * @dev get pool token rate
+    * @param tokenAmt total token amount
+    */
   function getCurrentRate(uint tokenAmt) public returns (uint) {
     return wdiv(totalSupply(), tokenAmt);
   }
 
+  /**
+    * @dev sets exchange rates
+    */
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, insuranceAmt);
     uint _currentRate = getCurrentRate(_totalToken);
     require(_currentRate != 0, "current-rate-is-zero");
-    if (_currentRate > _previousRate) {
-      uint _difTkn = sub(tokenBalance, _totalToken);
-      if (_difTkn < insuranceAmt) {
-        insuranceAmt = sub(insuranceAmt, _difTkn);
+    if (_currentRate > _previousRate) { // loss => deduct partially/fully from insurance amount
+      uint _loss = sub(tokenBalance, _totalToken);
+      if (_loss <= insuranceAmt) {
+        insuranceAmt = sub(insuranceAmt, _loss);
         _currentRate = _previousRate;
       } else {
-        insuranceAmt = 0;
         tokenBalance = add(_totalToken, insuranceAmt);
+        insuranceAmt = 0;
         _currentRate = getCurrentRate(tokenBalance);
       }
-    } else {
+    } else { // profit => add to insurance amount
       uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
       insuranceAmt = add(insuranceAmt, insureFeeAmt);
       tokenBalance = sub(_totalToken, insureFeeAmt);
