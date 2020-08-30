@@ -33,7 +33,7 @@ interface RateInterface {
 contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     using SafeERC20 for IERC20;
 
-    event LogDeploy(address token, uint amount);
+    event LogDeploy(address indexed dsa, address token, uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleBlock);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
@@ -46,7 +46,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     RegistryInterface public immutable registry; // Pool Registry
     IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723); // Main Index
 
-    uint private tokenBalance; // total token balance since last rebalancing
+    uint private tokenBalance; // total token balance
     uint public exchangeRate; // initial 1 token = 1
     uint public insuranceAmt; // insurance amount to keep pool safe
 
@@ -76,14 +76,14 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       } else { // non-pool other tokens
         IERC20(token).safeTransfer(_dsa, amount);
       }
-      emit LogDeploy(token, amount);
+      emit LogDeploy(_dsa, token, amount);
     }
 
     /**
       * @dev get pool token rate
       * @param tokenAmt total token amount
       */
-    function getCurrentRate(uint tokenAmt) public returns (uint) {
+    function getCurrentRate(uint tokenAmt) public view returns (uint) {
       return wdiv(totalSupply(), tokenAmt);
     }
 
