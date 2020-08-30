@@ -35,7 +35,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     event LogDeploy(address token, uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
-    event LogSettle(uint settleTime);
+    event LogSettle(uint settleBlock);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
     event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
     event LogAddInsurance(uint amount);
@@ -68,11 +68,11 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     function deploy(address _dsa, address token, uint amount) public isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
       require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");  
-      if (token == address(0)) {
+      if (token == address(0)) { // pool base token
         baseToken.safeTransfer(_dsa, amount);
-      } else if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE){
+      } else if (token == 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE){ // non-pool ethereum
         payable(_dsa).transfer(amount);
-      } else {
+      } else { // non-pool other tokens
         IERC20(token).safeTransfer(_dsa, amount);
       }
       emit LogDeploy(token, amount);
@@ -122,13 +122,12 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         dsaWallet.cast(_targets, _datas, _origin);
       }
       require(dsaWallet.isAuth(address(this)), "token-pool-not-auth"); 
- 
       setExchangeRate();
-      emit LogSettle(block.timestamp);
+      emit LogSettle(block.number);
     }
 
     function deposit(uint tknAmt) external whenNotPaused payable returns(uint) {
-      uint _newTokenBal = add(tokenBalance, tknAmt);
+      tokenBalance = add(tokenBalance, tknAmt);
 
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
       uint _mintAmt = wmul(tknAmt, exchangeRate);
@@ -151,6 +150,8 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _burnAmt = wmul(tknAmt, exchangeRate);
         _tknAmt = tknAmt;
       }
+
+      tokenBalance = sub(tokenBalance, _tknAmt);
 
       _burn(msg.sender, _burnAmt);
 
