@@ -127,6 +127,11 @@ contract Registry {
     emit LogUpdatePool(_pool, isPool[_pool]);
   }
 
+  /**
+    * @dev update pool rate logic
+    * @param _pool pool address
+    * @param _newLogic new rate logic address
+  */
   function updatePoolLogic(address _pool, address _newLogic) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newLogic != address(0), "invalid-address");
@@ -135,6 +140,11 @@ contract Registry {
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
+  /**
+    * @dev update pool insure fee 
+    * @param _pool pool address
+    * @param _newFee new fee amount
+  */
   function updateInsureFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newFee < 10 ** 18, "insure-fee-limit-reached");
@@ -143,6 +153,11 @@ contract Registry {
     emit LogUpdateInsureFee(_pool, _newFee);
   }
 
+  /**
+    * @dev update pool withdrawal fee 
+    * @param _pool pool address
+    * @param _newFee new withdrawal fee amount
+  */
   function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
     require(_newFee < 1 * 10 ** 16, "withdrawal-fee-limit-reached");
@@ -151,6 +166,11 @@ contract Registry {
     emit LogUpdateWithdrawalFee(_pool, _newFee);
   }
 
+  /**
+    * @dev add dsa for a pool 
+    * @param _pool pool address
+    * @param _dsa DSA address
+  */
   function addDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
     if (_dsa == address(0)) _dsa = instaIndex.build(_pool, 1, address(this));
@@ -159,6 +179,11 @@ contract Registry {
     emit LogNewDSA(_pool, _dsa);
   }
 
+  /**
+    * @dev remove dsa from a pool 
+    * @param _pool pool address
+    * @param _dsa DSA address
+  */
   function removeDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
     require(isDsa[_pool][_dsa], "not-dsa-for-pool");
