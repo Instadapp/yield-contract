@@ -39,6 +39,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogDeposit(uint depositAmt, uint poolMintAmt);
     event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
     event LogAddInsurance(uint amount);
+    event LogWithdrawInsurance(uint amount);
     event LogPausePool(bool);
 
     IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
@@ -180,7 +181,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       require(tknAmt <= insuranceAmt, "not-enough-insurance");
       baseToken.safeTransfer(msg.sender, tknAmt);
       insuranceAmt = sub(insuranceAmt, tknAmt);
-      emit LogAddInsurance(tknAmt);
+      emit LogWithdrawInsurance(tknAmt);
     }
 
     function shutdown() external {
