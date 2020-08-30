@@ -164,6 +164,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     */
     function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
       uint poolBal = baseToken.balanceOf(address(this));
+      require(to != address(0), "to-address-not-vaild");
       require(tknAmt <= poolBal, "not-enough-liquidity-available");
       uint _bal = balanceOf(msg.sender);
       uint _tknBal = wdiv(_bal, exchangeRate);
