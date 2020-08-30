@@ -22,7 +22,6 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
   function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
@@ -119,7 +118,6 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     function deposit(uint tknAmt) external whenNotPaused payable returns(uint) {
       uint _newTokenBal = add(tokenBalance, tknAmt);
-      require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
       uint _mintAmt = wmul(tknAmt, exchangeRate);

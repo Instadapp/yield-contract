@@ -14,7 +14,7 @@ contract Registry {
   event LogRemoveChief(address indexed chief);
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
-  event LogSwitchPool(address pool, bool poolState);
+  event LogUpdatePool(address pool, bool poolState);
   event LogUpdatePoolCap(address pool, uint newCap);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
@@ -34,8 +34,8 @@ contract Registry {
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
   mapping (address => uint) public withdrawalFee;
-  mapping (address => mapping(address => bool)) public isDsa; // Pool => DSA address => true/false
-  mapping (address => address[]) public dsaArr; // Pool => all dsa in array
+  mapping (address => mapping(address => bool)) public isDsa; // pool => dsa => bool
+  mapping (address => address[]) public dsaArr; // pool => all dsa in array
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -119,16 +119,13 @@ contract Registry {
     emit LogRemovePool(token, poolAddr);
   }
 
-  function switchPool(address _pool) external isMaster {
+  /**
+    * @dev enable / disable pool
+    * @param _pool pool address
+  */
+  function updatePool(address _pool) external isMaster {
     isPool[_pool] = !isPool[_pool];
-    emit LogSwitchPool(_pool, isPool[_pool]);
-  }
-
-  function updatePoolCap(address _pool, uint _newCap) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(poolCap[_pool] != _newCap, "same-pool-cap");
-    poolCap[_pool] = _newCap;
-    emit LogUpdatePoolCap(_pool, _newCap);
+    emit LogUpdatePool(_pool, isPool[_pool]);
   }
 
   function updatePoolLogic(address _pool, address _newLogic) external isMaster {
@@ -149,7 +146,7 @@ contract Registry {
 
   function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 5 * 10 ** 16, "insure-fee-limit-reached"); // max 5%
+    require(_newFee < 5 * 10 ** 16, "insure-fee-limit-reached");
     require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
     withdrawalFee[_pool] = _newFee;
     emit LogUpdateWithdrawalFee(_pool, _newFee);
