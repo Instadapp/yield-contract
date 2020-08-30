@@ -14,10 +14,10 @@ contract Registry {
   event LogRemoveChief(address indexed chief);
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
-  event LogSwitchPool(address pool, bool poolState);
-  event LogUpdatePoolCap(address pool, uint newCap);
+  event LogUpdatePool(address pool, bool poolState);
   event LogUpdatePoolLogic(address pool, address newLogic);
   event LogUpdateInsureFee(address pool, uint newFee);
+  event LogUpdateWithdrawalFee(address pool, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogNewDSA(address indexed pool, address indexed dsa);
@@ -32,8 +32,9 @@ contract Registry {
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public insureFee;
-  mapping (address => mapping(address => bool)) public isDsa; // Pool => DSA address => true/false
-  mapping (address => address[]) public dsaArr; // Pool => all dsa in array
+  mapping (address => uint) public withdrawalFee;
+  mapping (address => mapping(address => bool)) public isDsa; // pool => dsa => bool
+  mapping (address => address[]) public dsaArr; // pool => all dsa in array
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -117,16 +118,13 @@ contract Registry {
     emit LogRemovePool(token, poolAddr);
   }
 
-  function switchPool(address _pool) external isMaster {
+  /**
+    * @dev enable / disable pool
+    * @param _pool pool address
+  */
+  function updatePool(address _pool) external isMaster {
     isPool[_pool] = !isPool[_pool];
-    emit LogSwitchPool(_pool, isPool[_pool]);
-  }
-
-  function updatePoolCap(address _pool, uint _newCap) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(poolCap[_pool] != _newCap, "same-pool-cap");
-    poolCap[_pool] = _newCap;
-    emit LogUpdatePoolCap(_pool, _newCap);
+    emit LogUpdatePool(_pool, isPool[_pool]);
   }
 
   function updatePoolLogic(address _pool, address _newLogic) external isMaster {
@@ -145,13 +143,18 @@ contract Registry {
     emit LogUpdateInsureFee(_pool, _newFee);
   }
 
+  function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
+    require(isPool[_pool], "not-pool");
+    require(_newFee < 1 * 10 ** 16, "withdrawal-fee-limit-reached");
+    require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
+    withdrawalFee[_pool] = _newFee;
+    emit LogUpdateWithdrawalFee(_pool, _newFee);
+  }
+
   function addDsa(address _pool, address _dsa) external isMaster {
     require(isPool[_pool], "not-pool");
-    if (_dsa == address(0)) {
-      _dsa = instaIndex.build(_pool, 1, address(this));
-    }
+    if (_dsa == address(0)) _dsa = instaIndex.build(_pool, 1, address(this));
     isDsa[_pool][_dsa] = true;
-
     dsaArr[_pool].push(_dsa);
     emit LogNewDSA(_pool, _dsa);
   }

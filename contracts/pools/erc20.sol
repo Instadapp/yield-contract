@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DSMath } from "../libs/safeMath.sol";
 
 interface AccountInterface {
-  function enable(address authority) external;
   function isAuth(address) external view returns(bool);
   function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
 }
@@ -22,8 +21,8 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
+  function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
 }
 
@@ -38,7 +37,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleTime);
     event LogDeposit(uint depositAmt, uint poolMintAmt);
-    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
+    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
     event LogAddInsurance(uint amount);
     event LogPausePool(bool);
 
@@ -118,7 +117,6 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     function deposit(uint tknAmt) external whenNotPaused payable returns(uint) {
       uint _newTokenBal = add(tokenBalance, tknAmt);
-      require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
       uint _mintAmt = wmul(tknAmt, exchangeRate);
@@ -144,14 +142,22 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
       _burn(msg.sender, _burnAmt);
 
+      uint _withdrawalFee = registry.withdrawalFee(address(this));
+      uint _feeAmt;
+      if (_withdrawalFee > 0) {
+        _feeAmt = wmul(_tknAmt, _withdrawalFee);
+        insuranceAmt = add(insuranceAmt, _feeAmt);
+        _tknAmt = sub(_tknAmt, _feeAmt);
+      }
+
       baseToken.safeTransfer(to, _tknAmt);
 
-      emit LogWithdraw(tknAmt, _burnAmt);
+      emit LogWithdraw(tknAmt, _burnAmt, _feeAmt);
     }
 
     function addInsurance(uint tknAmt) external {
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-      insuranceAmt += tknAmt;
+      insuranceAmt = add(insuranceAmt, tknAmt);
       emit LogAddInsurance(tknAmt);
     }
 

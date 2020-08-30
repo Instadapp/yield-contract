@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import { DSMath } from "../libs/safeMath.sol";
 
 interface AccountInterface {
-  function enable(address authority) external;
+  function isAuth(address) external view returns(bool);
   function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
 }
 
@@ -21,8 +21,8 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function poolCap(address) external view returns (uint);
   function insureFee(address) external view returns (uint);
+  function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
 }
 
@@ -37,7 +37,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleTime);
   event LogDeposit(uint depositAmt, uint poolMintAmt);
-  event LogWithdraw(uint withdrawAmt, uint poolBurnAmt);
+  event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
   event LogAddInsurance(uint amount);
   event LogPausePool(bool);
 
@@ -66,6 +66,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+    require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth"); 
     if (token == address(0)) {
       payable(_dsa).transfer(amount);
     } else {
@@ -101,9 +102,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
   function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
+    AccountInterface dsaWallet = AccountInterface(_dsa);
     if (_targets.length > 0 && _datas.length > 0) {
-      AccountInterface(_dsa).cast(_targets, _datas, _origin);
+      dsaWallet.cast(_targets, _datas, _origin);
     }
+    require(dsaWallet.isAuth(address(this)), "token-pool-not-auth"); 
     setExchangeRate();
 
     emit LogSettle(block.timestamp);
@@ -112,7 +115,6 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   function deposit(uint tknAmt) public whenNotPaused payable returns(uint) {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _newTokenBal = add(tokenBalance, msg.value);
-    require(_newTokenBal <= registry.poolCap(address(this)), "deposit-cap-reached");
 
     uint _mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, _mintAmt);
@@ -137,9 +139,17 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
     _burn(msg.sender, _burnAmt);
 
+    uint _withdrawalFee = registry.withdrawalFee(address(this));
+    uint _feeAmt;
+    if (_withdrawalFee > 0) {
+      _feeAmt = wmul(_tknAmt, _withdrawalFee);
+      insuranceAmt = add(insuranceAmt, _feeAmt);
+      _tknAmt = sub(_tknAmt, _feeAmt);
+    }
+
     payable(to).transfer(_tknAmt);
 
-    emit LogWithdraw(tknAmt, _burnAmt);
+    emit LogWithdraw(tknAmt, _burnAmt, _feeAmt);
   }
 
   function addInsurance(uint tknAmt) external payable {
