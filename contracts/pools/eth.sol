@@ -36,8 +36,8 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogDeploy(address indexed dsa, address indexed token, uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
-  event LogDeposit(uint depositAmt, uint poolMintAmt);
-  event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
+  event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
+  event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
   event LogAddInsurance(uint amount);
   event LogWithdrawInsurance(uint amount);
   event LogPausePool(bool);
@@ -46,7 +46,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   IERC20 public immutable baseToken; // Base token.
-  uint private tokenBalance; // total token balance since last rebalancing
+  uint private tokenBalance; // total token balance
   uint public exchangeRate = 10 ** 18; // initial 1 token = 1
   uint public insuranceAmt; // insurance amount to keep pool safe
 
@@ -65,6 +65,12 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     _;
   }
 
+  /**
+    * @dev Deploy assets to DSA.
+    * @param _dsa DSA address
+    * @param token token address
+    * @param amount token amount
+  */
   function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
     require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");
@@ -79,14 +85,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   /**
     * @dev get pool token rate
     * @param tokenAmt total token amount
-    */
+  */
   function getCurrentRate(uint tokenAmt) public view returns (uint) {
     return wdiv(totalSupply(), tokenAmt);
   }
 
   /**
     * @dev sets exchange rates
-    */
+  */
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
@@ -113,6 +119,13 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
   }
 
+  /**
+    * @dev Settle the assets on dsa and update exchange rate
+    * @param _dsa DSA address
+    * @param _targets array of connector's address
+    * @param _datas array of connector's function calldata
+    * @param _origin origin address
+  */
   function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
     AccountInterface dsaWallet = AccountInterface(_dsa);
@@ -124,6 +137,11 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogSettle(block.number);
   }
 
+  /**
+    * @dev Deposit token.
+    * @param tknAmt token amount
+    * @return _mintAmt amount of wrap token minted
+  */
   function deposit(uint tknAmt) public whenNotPaused payable returns (uint _mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     tokenBalance = add(tokenBalance, tknAmt);
@@ -131,9 +149,15 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     _mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, _mintAmt);
 
-    emit LogDeposit(tknAmt, _mintAmt);
+    emit LogDeposit(msg.sender, tknAmt, _mintAmt);
   }
 
+  /**
+    * @dev Withdraw tokens.
+    * @param tknAmt token amount
+    * @param to withdraw tokens to address
+    * @return _tknAmt amount of token withdrawn
+  */
   function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
     uint poolBal = address(this).balance;
     require(tknAmt <= poolBal, "not-enough-liquidity-available");
@@ -163,15 +187,24 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
 
     payable(to).transfer(_tknAmt);
 
-    emit LogWithdraw(tknAmt, _burnAmt, _feeAmt);
+    emit LogWithdraw(msg.sender, tknAmt, _burnAmt, _feeAmt);
   }
 
+  /**
+    * @dev Add Insurance to the pool.
+    * @param tknAmt insurance token amount to add
+  */
   function addInsurance(uint tknAmt) external payable {
     require(tknAmt == msg.value, "unmatched-amount");
     insuranceAmt = add(insuranceAmt, tknAmt);
     emit LogAddInsurance(tknAmt);
   }
 
+  /**
+    * @dev Withdraw Insurance from the pool.
+    * @notice only master can call this function.
+    * @param tknAmt insurance token amount to remove
+  */
   function withdrawInsurance(uint tknAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
     require(tknAmt <= insuranceAmt, "not-enough-insurance");
@@ -180,11 +213,14 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     emit LogWithdrawInsurance(tknAmt);
   }
 
+  /**
+    * @dev Shut the pool.
+    * @notice only master can call this function.
+  */
   function shutdown() external {
     require(msg.sender == instaIndex.master(), "not-master");
     paused() ? _unpause() : _pause();
   }
 
   receive() external payable {}
-
 }

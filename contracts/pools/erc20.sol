@@ -36,8 +36,8 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogDeploy(address indexed dsa, address token, uint amount);
     event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
     event LogSettle(uint settleBlock);
-    event LogDeposit(uint depositAmt, uint poolMintAmt);
-    event LogWithdraw(uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
+    event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
+    event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
     event LogAddInsurance(uint amount);
     event LogWithdrawInsurance(uint amount);
     event LogPausePool(bool);
@@ -66,6 +66,12 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _;
     }
 
+    /**
+      * @dev Deploy assets to DSA.
+      * @param _dsa DSA address
+      * @param token token address
+      * @param amount token amount
+    */
     function deploy(address _dsa, address token, uint amount) public isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
       require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");  
@@ -116,6 +122,13 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
     }
 
+    /**
+      * @dev Settle the assets on dsa and update exchange rate
+      * @param _dsa DSA address
+      * @param _targets array of connector's address
+      * @param _datas array of connector's function calldata
+      * @param _origin origin address
+    */
     function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
       require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
       AccountInterface dsaWallet = AccountInterface(_dsa);
@@ -127,6 +140,11 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogSettle(block.number);
     }
 
+    /**
+      * @dev Deposit token.
+      * @param tknAmt token amount
+      * @return _mintAmt amount of wrap token minted
+    */
     function deposit(uint tknAmt) external whenNotPaused payable returns (uint _mintAmt) {
       require(msg.value == 0, "non-eth-pool");
       tokenBalance = add(tokenBalance, tknAmt);
@@ -135,9 +153,15 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       _mintAmt = wmul(tknAmt, exchangeRate);
       _mint(msg.sender, _mintAmt);
 
-      emit LogDeposit(tknAmt, _mintAmt);
+      emit LogDeposit(msg.sender, tknAmt, _mintAmt);
     }
 
+    /**
+      * @dev Withdraw tokens.
+      * @param tknAmt token amount
+      * @param to withdraw tokens to address
+      * @return _tknAmt amount of token withdrawn
+    */
     function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
       uint poolBal = baseToken.balanceOf(address(this));
       require(tknAmt <= poolBal, "not-enough-liquidity-available");
@@ -167,15 +191,24 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
       baseToken.safeTransfer(to, _tknAmt);
 
-      emit LogWithdraw(tknAmt, _burnAmt, _feeAmt);
+      emit LogWithdraw(msg.sender, tknAmt, _burnAmt, _feeAmt);
     }
 
+    /**
+      * @dev Add Insurance to the pool.
+      * @param tknAmt insurance token amount to add
+    */
     function addInsurance(uint tknAmt) external {
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
       insuranceAmt = add(insuranceAmt, tknAmt);
       emit LogAddInsurance(tknAmt);
     }
 
+    /**
+      * @dev Withdraw Insurance from the pool.
+      * @notice only master can call this function.
+      * @param tknAmt insurance token amount to remove
+    */
     function withdrawInsurance(uint tknAmt) external {
       require(msg.sender == instaIndex.master(), "not-master");
       require(tknAmt <= insuranceAmt, "not-enough-insurance");
@@ -184,6 +217,10 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       emit LogWithdrawInsurance(tknAmt);
     }
 
+    /**
+      * @dev Shut the pool.
+      * @notice only master can call this function.
+    */
     function shutdown() external {
       require(msg.sender == instaIndex.master(), "not-master");
       paused() ? _unpause() : _pause();
