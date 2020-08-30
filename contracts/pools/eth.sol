@@ -30,7 +30,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
+contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   using SafeERC20 for IERC20;
 
   event LogDeploy(address indexed token, uint amount);
