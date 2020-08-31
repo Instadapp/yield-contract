@@ -17,4 +17,6 @@ contract EthRateLogic {
     constructor (address ethPool) public {
         poolToken = address(ethPool);
     }
+
+  receive() external payable {}
 }
