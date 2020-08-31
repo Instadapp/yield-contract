@@ -2,10 +2,8 @@ const { BN, ether, balance } = require('@openzeppelin/test-helpers');
 const { expect } = require('chai');
 
 const RegistryContract = artifacts.require("Registry");
-const PoolTokenContract = artifacts.require("PoolToken");
 const PoolETHContract = artifacts.require("PoolETH");
 
-const DaiRateLogic = artifacts.require("DaiRateLogic");
 const EthRateLogic = artifacts.require("EthRateLogic");
 
 
@@ -45,11 +43,11 @@ contract('ETH Pool', async accounts => {
     await addPool(registryInstance, ethPoolInstance.address, ethAddr);
   });
 
-  it('should enable DAI pool in registry', async () => {
+  it('should enable ETH pool in registry', async () => {
       await enablePool(registryInstance, ethPoolInstance.address);
   });
 
-  it('should update DAI Logic contract in registry', async () => {
+  it('should update ETH Logic contract in registry', async () => {
       await updateRateLogic(registryInstance, ethPoolInstance.address, ethRateLogicInstance.address);
   });
 
@@ -92,7 +90,7 @@ contract('ETH Pool', async accounts => {
   it('should withdraw total ETH in ETH pool', async () => {
     var amountInWei = (ether("1000")).toString()
     var checkAmt = (ether("4.5")).toString()
-    await ethPoolInstance.withdraw(amountInWei, accounts[3], {from: userAddress});
+    await ethPoolInstance.withdraw(amountInWei, accounts[3], {from: accountA});
     const ethBalance = await web3.eth.getBalance(accounts[3]);
     expect(new BN(ethBalance)).to.be.bignumber.least(checkAmt);
   });

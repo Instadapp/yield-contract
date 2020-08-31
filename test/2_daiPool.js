@@ -136,7 +136,7 @@ contract('DAI Pool', async accounts => {
     var amountInWei = (ether("1000")).toString()
     var checkAmt = (ether("90")).toString()
     await daiPoolInstance.withdraw(amountInWei, accounts[2], {from: userAddress});
-    const daiBalance = await daiContract.methods.balanceOf(accounts[3]).call();
+    const daiBalance = await daiContract.methods.balanceOf(accounts[2]).call();
     expect(new BN(daiBalance)).to.be.bignumber.least(checkAmt);
   });
 });
