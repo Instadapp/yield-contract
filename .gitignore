@@ -7,3 +7,5 @@ build/*
 
 #Vim
 *.swp
+
+.env
