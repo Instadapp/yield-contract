@@ -175,7 +175,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
         _burnAmt = wmul(tknAmt, exchangeRate);
         _tknAmt = tknAmt;
       }
-      require(tknAmt <= poolBal, "not-enough-liquidity-available");
+      require(_tknAmt <= poolBal, "not-enough-liquidity-available");
 
       tokenBalance = sub(tokenBalance, _tknAmt);
 
