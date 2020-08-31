@@ -191,7 +191,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
       baseToken.safeTransfer(to, _tknAmt);
 
-      emit LogWithdraw(msg.sender, tknAmt, _burnAmt, _feeAmt);
+      emit LogWithdraw(msg.sender, _tknAmt, _burnAmt, _feeAmt);
     }
 
     /**
