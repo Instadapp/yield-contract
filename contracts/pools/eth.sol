@@ -171,7 +171,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
       _burnAmt = wmul(tknAmt, exchangeRate);
       _tknAmt = tknAmt;
     }
-    require(tknAmt <= poolBal, "not-enough-liquidity-available");
+    require(_tknAmt <= poolBal, "not-enough-liquidity-available");
 
     tokenBalance = sub(tokenBalance, _tknAmt);
 
