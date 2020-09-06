@@ -16,6 +16,7 @@ contract Registry {
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePoolLogic(address token, address newLogic);
   event LogUpdateFee(address token, uint newFee);
+  event LogUpdateCap(address token, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogAddSettleLogic(address indexed token, address indexed logic);
@@ -118,14 +119,14 @@ contract Registry {
     address _pool = poolToken[_token];
     require(_pool != address(0), "invalid-pool");
     require(_newLogic != address(0), "invalid-address");
-    require( poolLogic[_pool] != _newLogic, "same-pool-logic");
+    require(poolLogic[_pool] != _newLogic, "same-pool-logic");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
   /**
     * @dev update pool fee
-    * @param _pool pool address
+    * @param _token pool address
     * @param _newFee new fee amount
   */
   function updateFee(address _token, uint _newFee) external isMaster {
@@ -135,6 +136,18 @@ contract Registry {
     require(fee[_pool] != _newFee, "same-pool-fee");
     fee[_pool] = _newFee;
     emit LogUpdateFee(_pool, _newFee);
+  }
+
+  /**
+    * @dev update pool fee
+    * @param _token pool address
+    * @param _newCap new fee amount
+  */
+  function updateCap(address _token, uint _newCap) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    poolCap[_pool] = _newCap;
+    emit LogUpdateCap(_pool, _newCap);
   }
 
   function addSettleLogic(address _token, address _logic) external isMaster {
