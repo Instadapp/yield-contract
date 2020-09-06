@@ -75,7 +75,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   function deploy(address _dsa, address token, uint amount) external isChief {
     require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
     require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");
-    if (token == address(0)) { // pool base ETH
+    if (token == address(0)) { // pool ETH
       payable(_dsa).transfer(amount);
     } else { // non-pool other tokens
       IERC20(token).safeTransfer(_dsa, amount);
@@ -100,9 +100,9 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     _totalToken = sub(_totalToken, feeAmt);
     uint _currentRate = getCurrentRate(_totalToken);
     require(_currentRate != 0, "current-rate-is-zero");
-    if (_currentRate > _previousRate) { // loss => deduct partially/fully from insurance amount
+    if (_currentRate > _previousRate) {
         _currentRate = _previousRate;
-    } else { // profit => add to insurance amount
+    } else {
       uint _newFee = wmul(sub(_totalToken, tokenBalance), registry.fee(address(this)));
       feeAmt = add(feeAmt, _newFee);
       tokenBalance = sub(_totalToken, _newFee);
