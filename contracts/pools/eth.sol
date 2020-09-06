@@ -38,7 +38,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
   event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt);
   event LogWithdrawFee(uint amount);
-  event LogPausePool(bool);
 
   IERC20 public immutable baseToken; // Base token.
   RegistryInterface public immutable registry; // Pool Registry
@@ -76,7 +75,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   }
 
   /**
-    * @dev sets exchange rates
+    * @dev sets exchange rate
     */
   function setExchangeRate() public {
     require(msg.sender == address(this), "not-pool-address");
@@ -84,12 +83,11 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, feeAmt);
     uint _newRate = getCurrentRate(_totalToken);
-    uint _tokenBal;
     require(_newRate != 0, "current-rate-is-zero");
+    uint _tokenBal = wdiv(totalSupply(), _prevRate);
     if (_newRate > _prevRate) {
       _newRate = _prevRate;
     } else {
-      _tokenBal = wdiv(totalSupply(), _prevRate);
       uint _newFee = wmul(sub(_totalToken, _tokenBal), registry.fee(address(this)));
       feeAmt = add(feeAmt, _newFee);
       _tokenBal = sub(_totalToken, _newFee);
@@ -142,7 +140,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
-    require(_newTknBal < registry.poolCap(address(this)), "unmatched-amount");
+    require(_newTknBal < registry.poolCap(address(this)), "pool-cap-reached");
     mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, mintAmt);
     emit LogDeposit(msg.sender, tknAmt, mintAmt);
