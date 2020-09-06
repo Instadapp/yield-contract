@@ -8,11 +8,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 import { DSMath } from "../libs/safeMath.sol";
 
-interface AccountInterface {
-  function isAuth(address) external view returns(bool);
-  function cast(address[] calldata _targets, bytes[] calldata _datas, address _origin) external payable;
-}
-
 interface IndexInterface {
   function master() external view returns (address);
   function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
@@ -22,7 +17,6 @@ interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
   function fee(address) external view returns (uint);
-  function isDsa(address, address) external view returns (bool);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
 }
 
@@ -33,7 +27,6 @@ interface RateInterface {
 contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   using SafeERC20 for IERC20;
 
-  event LogDeploy(address indexed dsa, address indexed token, uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
   event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
@@ -45,7 +38,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   RegistryInterface public immutable registry; // Pool Registry
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
-  uint private tokenBalance; // total token balance
   uint public exchangeRate = 10 ** 18; // initial 1 token = 1
   uint public feeAmt; // fee collected on profits
 
@@ -65,27 +57,10 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   }
 
   /**
-    * @dev Deploy assets to DSA.
-    * @param _dsa DSA address
-    * @param token token address
-    * @param amount token amount
-  */
-  function deploy(address _dsa, address token, uint amount) external isChief {
-    require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
-    require(AccountInterface(_dsa).isAuth(address(this)), "token-pool-not-auth");
-    if (token == address(0)) { // pool ETH
-      payable(_dsa).transfer(amount);
-    } else { // non-pool other tokens
-      IERC20(token).safeTransfer(_dsa, amount);
-    }
-    emit LogDeploy(_dsa, token, amount);
-  }
-
-  /**
     * @dev get pool token rate
     * @param tokenAmt total token amount
   */
-  function getCurrentRate(uint tokenAmt) public view returns (uint) {
+  function getCurrentRate(uint tokenAmt) internal returns (uint) {
     return wdiv(totalSupply(), tokenAmt);
   }
 
@@ -93,25 +68,26 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @dev sets exchange rates
     */
   function setExchangeRate() public isChief {
-    uint _previousRate = exchangeRate;
-    uint totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-    totalToken = sub(totalToken, feeAmt);
-    uint _currentRate = getCurrentRate(totalToken);
-    require(_currentRate != 0, "current-rate-is-zero");
-    if (_currentRate > _previousRate) {
-        _currentRate = _previousRate;
+    uint _prevRate = exchangeRate;
+    uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
+    _totalToken = sub(_totalToken, feeAmt);
+    uint _newRate = getCurrentRate(_totalToken);
+    require(_newRate != 0, "current-rate-is-zero");
+    if (_newRate > _prevRate) {
+      _newRate = _prevRate;
     } else {
-      uint newFee = wmul(sub(totalToken, tokenBalance), registry.fee(address(this)));
-      feeAmt = add(feeAmt, newFee);
-      tokenBalance = sub(totalToken, newFee);
-      _currentRate = getCurrentRate(tokenBalance);
+      uint _tokenBal = wdiv(totalSupply(), _prevRate);
+      uint _newFee = wmul(sub(_totalToken, _tokenBal), registry.fee(address(this)));
+      feeAmt = add(feeAmt, _newFee);
+      _tokenBal = sub(_totalToken, _newFee);
+      _newRate = getCurrentRate(_tokenBal);
     }
-    exchangeRate = _currentRate;
-    emit LogExchangeRate(exchangeRate, tokenBalance, feeAmt);
+    exchangeRate = _newRate;
+    emit LogExchangeRate(exchangeRate, _tokenBal, feeAmt);
   }
 
   /**
-    * @dev Delegate the calls to Connector And this function is ran by cast().
+    * @dev delegate the calls to connector and this function is ran by settle()
     * @param _target Target to of Connector.
     * @param _data CallData of function in Connector.
   */
@@ -141,7 +117,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     for (uint i = 0; i < _targets.length; i++) {
       spell(_targets[i], _data[i]);
     }
-    setExchangeRate();
     emit LogSettle(block.number);
   }
 
@@ -152,11 +127,8 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   */
   function deposit(uint tknAmt) public whenNotPaused payable returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
-    tokenBalance = add(tokenBalance, tknAmt);
-
     mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, mintAmt);
-
     emit LogDeposit(msg.sender, tknAmt, mintAmt);
   }
 
@@ -168,22 +140,21 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   */
   function withdraw(uint tknAmt, address target) external nonReentrant whenNotPaused returns (uint wdAmt) {
     require(target != address(0), "invalid-target-address");
-    uint userBal = wdiv(balanceOf(msg.sender), exchangeRate);
-    uint burnAmt;
-    if (tknAmt >= userBal) {
-      burnAmt = balanceOf(msg.sender);
-      wdAmt = userBal;
+    uint _userBal = wdiv(balanceOf(msg.sender), exchangeRate);
+    uint _burnAmt;
+    if (tknAmt >= _userBal) {
+      _burnAmt = balanceOf(msg.sender);
+      wdAmt = _userBal;
     } else {
-      burnAmt = wmul(tknAmt, exchangeRate);
+      _burnAmt = wmul(tknAmt, exchangeRate);
       wdAmt = tknAmt;
     }
     require(wdAmt <= address(this).balance, "not-enough-liquidity-available");
 
-    _burn(msg.sender, burnAmt);
-    tokenBalance = sub(tokenBalance, wdAmt);
+    _burn(msg.sender, _burnAmt);
     payable(target).transfer(wdAmt);
 
-    emit LogWithdraw(msg.sender, wdAmt, burnAmt);
+    emit LogWithdraw(msg.sender, wdAmt, _burnAmt);
   }
 
   /**
