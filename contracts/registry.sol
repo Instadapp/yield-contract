@@ -15,6 +15,7 @@ contract Registry {
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePoolLogic(address token, address newLogic);
+  event LogUpdateFlusherLogic(address token, address newLogic);
   event LogUpdateFee(address token, uint newFee);
   event LogUpdateCap(address token, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
@@ -28,6 +29,7 @@ contract Registry {
   mapping (address => bool) public signer;
   mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
+  mapping (address => address) public flusherLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public fee;
   mapping (address => mapping(address => bool)) public settleLogic;
@@ -122,6 +124,20 @@ contract Registry {
     require(poolLogic[_pool] != _newLogic, "same-pool-logic");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
+  }
+
+  /**
+    * @dev update flusher logic
+    * @param _token pool address
+    * @param _newLogic new flusher logic address
+  */
+  function updateFlusherLogic(address _token, address _newLogic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    require(_newLogic != address(0), "invalid-address");
+    require(flusherLogic[_pool] != _newLogic, "same-pool-logic");
+    flusherLogic[_pool] = _newLogic;
+    emit LogUpdateFlusherLogic(_pool, _newLogic);
   }
 
   /**
