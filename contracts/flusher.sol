@@ -12,6 +12,8 @@ contract Flusher {
   event LogCast(address indexed sender, uint value);
 
   string constant public name = "Flusher-v1";
+  uint constant version = 1;
+
   RegistryInterface public constant registry = RegistryInterface(address(0)); // TODO - Change while deploying.
 
   function spell(address _target, bytes memory _data) internal {
