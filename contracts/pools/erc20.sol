@@ -10,7 +10,6 @@ import { DSMath } from "../libs/safeMath.sol";
 
 interface IndexInterface {
   function master() external view returns (address);
-  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 interface RegistryInterface {
