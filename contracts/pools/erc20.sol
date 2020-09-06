@@ -21,9 +21,10 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function insureFee(address) external view returns (uint);
+  function fee(address) external view returns (uint);
   function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
+  function checkSettleLogics(address, address[] calldata) external view returns (bool);
 }
 
 interface RateInterface {
@@ -38,8 +39,8 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     event LogSettle(uint settleBlock);
     event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
     event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
-    event LogAddInsurance(uint amount);
-    event LogWithdrawInsurance(uint amount);
+    event LogAddFee(uint amount);
+    event LogWithdrawFee(uint amount);
     event LogPausePool(bool);
 
     IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
@@ -48,7 +49,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
 
     uint private tokenBalance; // total token balance
     uint public exchangeRate; // initial 1 token = 1
-    uint public insuranceAmt; // insurance amount to keep pool safe
+    uint public feeAmt; // fee collected on profits
 
     constructor(
         address _registry,
@@ -62,7 +63,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     }
 
     modifier isChief() {
-        require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
+        require(registry.chief(msg.sender) || msg.sender == instaIndex.master() || msg.sender == address(this), "not-chief");
         _;
     }
 
@@ -99,43 +100,52 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
     function setExchangeRate() public isChief {
       uint _previousRate = exchangeRate;
       uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-      _totalToken = sub(_totalToken, insuranceAmt);
+      _totalToken = sub(_totalToken, feeAmt);
       uint _currentRate = getCurrentRate(_totalToken);
       require(_currentRate != 0, "current-rate-is-zero");
       if (_currentRate > _previousRate) { // loss => deduct partially/fully from insurance amount
-        uint _loss = sub(tokenBalance, _totalToken);
-        if (_loss <= insuranceAmt) {
-          insuranceAmt = sub(insuranceAmt, _loss);
           _currentRate = _previousRate;
-        } else {
-          tokenBalance = add(_totalToken, insuranceAmt);
-          insuranceAmt = 0;
-          _currentRate = getCurrentRate(tokenBalance);
-        }
       } else { // profit => add to insurance amount
-        uint insureFeeAmt = wmul(sub(_totalToken, tokenBalance), registry.insureFee(address(this)));
-        insuranceAmt = add(insuranceAmt, insureFeeAmt);
-        tokenBalance = sub(_totalToken, insureFeeAmt);
+        uint _newFee = wmul(sub(_totalToken, tokenBalance), registry.fee(address(this)));
+        feeAmt = add(feeAmt, _newFee);
+        tokenBalance = sub(_totalToken, _newFee);
         _currentRate = getCurrentRate(tokenBalance);
       }
       exchangeRate = _currentRate;
-      emit LogExchangeRate(exchangeRate, tokenBalance, insuranceAmt);
+      emit LogExchangeRate(exchangeRate, tokenBalance, feeAmt);
+    }
+
+    /**
+     * @dev Delegate the calls to Connector And this function is ran by cast().
+     * @param _target Target to of Connector.
+     * @param _data CallData of function in Connector.
+    */
+    function spell(address _target, bytes memory _data) internal {
+      require(_target != address(0), "target-invalid");
+      assembly {
+        let succeeded := delegatecall(gas(), _target, add(_data, 0x20), mload(_data), 0, 0)
+
+        switch iszero(succeeded)
+          case 1 {
+            // throw if delegatecall failed
+            let size := returndatasize()
+            returndatacopy(0x00, 0x00, size)
+            revert(0x00, size)
+          }
+      }
     }
 
     /**
       * @dev Settle the assets on dsa and update exchange rate
-      * @param _dsa DSA address
       * @param _targets array of connector's address
-      * @param _datas array of connector's function calldata
-      * @param _origin origin address
+      * @param _data array of connector's function calldata
     */
-    function settle(address _dsa, address[] calldata _targets, bytes[] calldata _datas, address _origin) external isChief {
-      require(registry.isDsa(address(this), _dsa), "not-autheticated-dsa");
-      AccountInterface dsaWallet = AccountInterface(_dsa);
-      if (_targets.length > 0 && _datas.length > 0) {
-        dsaWallet.cast(_targets, _datas, _origin);
+    function settle(address[] calldata _targets, bytes[] calldata _data) external isChief {
+      require(_targets.length == _data.length , "array-length-invalid");
+      require(registry.checkSettleLogics(address(this), _targets), "not-logic");
+      for (uint i = 0; i < _targets.length; i++) {
+        spell(_targets[i], _data[i]);
       }
-      require(dsaWallet.isAuth(address(this)), "token-pool-not-auth"); 
       setExchangeRate();
       emit LogSettle(block.number);
     }
@@ -185,7 +195,7 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       uint _feeAmt;
       if (_withdrawalFee > 0) {
         _feeAmt = wmul(_tknAmt, _withdrawalFee);
-        insuranceAmt = add(insuranceAmt, _feeAmt);
+        feeAmt = add(feeAmt, _feeAmt);
         _tknAmt = sub(_tknAmt, _feeAmt);
       }
 
@@ -198,10 +208,10 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       * @dev Add Insurance to the pool.
       * @param tknAmt insurance token amount to add
     */
-    function addInsurance(uint tknAmt) external {
+    function addFee(uint tknAmt) external {
       baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-      insuranceAmt = add(insuranceAmt, tknAmt);
-      emit LogAddInsurance(tknAmt);
+      feeAmt = add(feeAmt, tknAmt);
+      emit LogAddFee(tknAmt);
     }
 
     /**
@@ -209,12 +219,12 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
       * @notice only master can call this function.
       * @param tknAmt insurance token amount to remove
     */
-    function withdrawInsurance(uint tknAmt) external {
+    function withdrawFee(uint tknAmt) external {
       require(msg.sender == instaIndex.master(), "not-master");
-      require(tknAmt <= insuranceAmt, "not-enough-insurance");
+      require(tknAmt <= feeAmt, "not-enough-insurance");
       baseToken.safeTransfer(msg.sender, tknAmt);
-      insuranceAmt = sub(insuranceAmt, tknAmt);
-      emit LogWithdrawInsurance(tknAmt);
+      feeAmt = sub(feeAmt, tknAmt);
+      emit LogWithdrawFee(tknAmt);
     }
 
     /**

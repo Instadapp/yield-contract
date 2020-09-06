@@ -16,12 +16,14 @@ contract Registry {
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePool(address pool, bool poolState);
   event LogUpdatePoolLogic(address pool, address newLogic);
-  event LogUpdateInsureFee(address pool, uint newFee);
+  event LogUpdateFee(address pool, uint newFee);
   event LogUpdateWithdrawalFee(address pool, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogNewDSA(address indexed pool, address indexed dsa);
   event LogRemoveDSA(address indexed pool, address indexed dsa);
+  event LogAddSettleLogic(address indexed pool, address indexed logic);
+  event LogRemoveSettleLogic(address indexed pool, address indexed logic);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
@@ -31,8 +33,9 @@ contract Registry {
   mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
-  mapping (address => uint) public insureFee;
+  mapping (address => uint) public fee;
   mapping (address => uint) public withdrawalFee;
+  mapping (address => mapping(address => bool)) public settleLogic;
   mapping (address => mapping(address => bool)) public isDsa; // pool => dsa => bool
   mapping (address => address[]) public dsaArr; // pool => all dsa in array
 
@@ -145,12 +148,12 @@ contract Registry {
     * @param _pool pool address
     * @param _newFee new fee amount
   */
-  function updateInsureFee(address _pool, uint _newFee) external isMaster {
+  function updateFee(address _pool, uint _newFee) external isMaster {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 10 ** 18, "insure-fee-limit-reached");
-    require(insureFee[_pool] != _newFee, "same-pool-fee");
-    insureFee[_pool] = _newFee;
-    emit LogUpdateInsureFee(_pool, _newFee);
+    require(_newFee < 3 * 10 ** 17, "insure-fee-limit-reached");
+    require(fee[_pool] != _newFee, "same-pool-fee");
+    fee[_pool] = _newFee;
+    emit LogUpdateFee(_pool, _newFee);
   }
 
   /**
@@ -164,6 +167,27 @@ contract Registry {
     require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
     withdrawalFee[_pool] = _newFee;
     emit LogUpdateWithdrawalFee(_pool, _newFee);
+  }
+
+  function addSettleLogic(address _pool, address _logic) external isMaster {
+    require(isPool[_pool], "not-pool");
+    settleLogic[_pool][_logic] = true;
+    emit LogAddSettleLogic(_pool, _logic);
+  }
+
+  function removeSettleLogic(address _pool, address _logic) external isMaster {
+    require(isPool[_pool], "not-pool");
+    delete settleLogic[_pool][_logic];
+    emit LogRemoveSettleLogic(_pool, _logic);
+  }
+
+  function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool) {
+    for (uint i = 0; i < _logics.length; i++) {
+      if (!settleLogic[_pool][_logics[i]]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
