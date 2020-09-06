@@ -16,8 +16,7 @@ contract Registry {
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePool(address pool, bool poolState);
   event LogUpdatePoolLogic(address pool, address newLogic);
-  event LogUpdateFee(address pool, uint newFee);
-  event LogUpdateWithdrawalFee(address pool, uint newFee);
+  event LogUpdateTariff(address pool, uint newTariff);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogNewDSA(address indexed pool, address indexed dsa);
@@ -33,8 +32,7 @@ contract Registry {
   mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
-  mapping (address => uint) public fee;
-  mapping (address => uint) public withdrawalFee;
+  mapping (address => uint) public tariff;
   mapping (address => mapping(address => bool)) public settleLogic;
   mapping (address => mapping(address => bool)) public isDsa; // pool => dsa => bool
   mapping (address => address[]) public dsaArr; // pool => all dsa in array
@@ -144,29 +142,16 @@ contract Registry {
   }
 
   /**
-    * @dev update pool insure fee 
+    * @dev update pool tariff
     * @param _pool pool address
-    * @param _newFee new fee amount
+    * @param _newTariff new tariff amount
   */
-  function updateFee(address _pool, uint _newFee) external isMaster {
+  function updateTariff(address _pool, uint _newTariff) external isMaster {
     require(isPool[_pool], "not-pool");
-    require(_newFee < 3 * 10 ** 17, "insure-fee-limit-reached");
-    require(fee[_pool] != _newFee, "same-pool-fee");
-    fee[_pool] = _newFee;
-    emit LogUpdateFee(_pool, _newFee);
-  }
-
-  /**
-    * @dev update pool withdrawal fee 
-    * @param _pool pool address
-    * @param _newFee new withdrawal fee amount
-  */
-  function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(_newFee < 1 * 10 ** 16, "withdrawal-fee-limit-reached");
-    require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
-    withdrawalFee[_pool] = _newFee;
-    emit LogUpdateWithdrawalFee(_pool, _newFee);
+    require(_newTariff < 3 * 10 ** 17, "insure-tariff-limit-reached");
+    require(tariff[_pool] != _newTariff, "same-pool-tariff");
+    tariff[_pool] = _newTariff;
+    emit LogUpdateTariff(_pool, _newTariff);
   }
 
   function addSettleLogic(address _pool, address _logic) external isMaster {

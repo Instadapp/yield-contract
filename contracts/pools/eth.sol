@@ -22,7 +22,6 @@ interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
   function fee(address) external view returns (uint);
-  function withdrawalFee(address) external view returns (uint);
   function isDsa(address, address) external view returns (bool);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
 }
@@ -38,8 +37,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
   event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
-  event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt, uint feeAmt);
-  event LogAddFee(uint amount);
+  event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt);
   event LogWithdrawFee(uint amount);
   event LogPausePool(bool);
 
@@ -96,16 +94,16 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     */
   function setExchangeRate() public isChief {
     uint _previousRate = exchangeRate;
-    uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
-    _totalToken = sub(_totalToken, feeAmt);
-    uint _currentRate = getCurrentRate(_totalToken);
+    uint totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
+    totalToken = sub(totalToken, feeAmt);
+    uint _currentRate = getCurrentRate(totalToken);
     require(_currentRate != 0, "current-rate-is-zero");
     if (_currentRate > _previousRate) {
         _currentRate = _previousRate;
     } else {
-      uint _newFee = wmul(sub(_totalToken, tokenBalance), registry.fee(address(this)));
-      feeAmt = add(feeAmt, _newFee);
-      tokenBalance = sub(_totalToken, _newFee);
+      uint newFee = wmul(sub(totalToken, tokenBalance), registry.fee(address(this)));
+      feeAmt = add(feeAmt, newFee);
+      tokenBalance = sub(totalToken, newFee);
       _currentRate = getCurrentRate(tokenBalance);
     }
     exchangeRate = _currentRate;
@@ -150,77 +148,55 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   /**
     * @dev Deposit token.
     * @param tknAmt token amount
-    * @return _mintAmt amount of wrap token minted
+    * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) public whenNotPaused payable returns (uint _mintAmt) {
+  function deposit(uint tknAmt) public whenNotPaused payable returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     tokenBalance = add(tokenBalance, tknAmt);
 
-    _mintAmt = wmul(msg.value, exchangeRate);
-    _mint(msg.sender, _mintAmt);
+    mintAmt = wmul(msg.value, exchangeRate);
+    _mint(msg.sender, mintAmt);
 
-    emit LogDeposit(msg.sender, tknAmt, _mintAmt);
+    emit LogDeposit(msg.sender, tknAmt, mintAmt);
   }
 
   /**
     * @dev Withdraw tokens.
     * @param tknAmt token amount
-    * @param to withdraw tokens to address
-    * @return _tknAmt amount of token withdrawn
+    * @param target withdraw tokens to address
+    * @return "wdAmt" amount of token withdrawn
   */
-  function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
-    uint poolBal = address(this).balance;
-    require(to != address(0), "to-address-not-vaild");
-    uint _bal = balanceOf(msg.sender);
-    uint _tknBal = wdiv(_bal, exchangeRate);
-    uint _burnAmt;
-    if (tknAmt >= _tknBal) {
-      _burnAmt = _bal;
-      _tknAmt = _tknBal;
+  function withdraw(uint tknAmt, address target) external nonReentrant whenNotPaused returns (uint wdAmt) {
+    require(target != address(0), "invalid-target-address");
+    uint userBal = wdiv(balanceOf(msg.sender), exchangeRate);
+    uint burnAmt;
+    if (tknAmt >= userBal) {
+      burnAmt = balanceOf(msg.sender);
+      wdAmt = userBal;
     } else {
-      _burnAmt = wmul(tknAmt, exchangeRate);
-      _tknAmt = tknAmt;
+      burnAmt = wmul(tknAmt, exchangeRate);
+      wdAmt = tknAmt;
     }
-    require(_tknAmt <= poolBal, "not-enough-liquidity-available");
+    require(wdAmt <= address(this).balance, "not-enough-liquidity-available");
 
-    tokenBalance = sub(tokenBalance, _tknAmt);
+    _burn(msg.sender, burnAmt);
+    tokenBalance = sub(tokenBalance, wdAmt);
+    payable(target).transfer(wdAmt);
 
-    _burn(msg.sender, _burnAmt);
-
-    uint _withdrawalFee = registry.withdrawalFee(address(this));
-    uint _feeAmt;
-    if (_withdrawalFee > 0) {
-      _feeAmt = wmul(_tknAmt, _withdrawalFee);
-      feeAmt = add(feeAmt, _feeAmt);
-      _tknAmt = sub(_tknAmt, _feeAmt);
-    }
-
-    payable(to).transfer(_tknAmt);
-
-    emit LogWithdraw(msg.sender, _tknAmt, _burnAmt, _feeAmt);
+    emit LogWithdraw(msg.sender, wdAmt, burnAmt);
   }
 
   /**
-    * @dev Add Insurance to the pool.
-    * @param tknAmt insurance token amount to add
+    * @dev withdraw fee from the pool
+    * @notice only master can call this function
+    * @param wdAmt fee amount to withdraw
   */
-  function addFee(uint tknAmt) external payable {
-    require(tknAmt == msg.value, "unmatched-amount");
-    feeAmt = add(feeAmt, tknAmt);
-    emit LogAddFee(tknAmt);
-  }
-
-  /**
-    * @dev Withdraw Insurance from the pool.
-    * @notice only master can call this function.
-    * @param tknAmt insurance token amount to remove
-  */
-  function withdrawFee(uint tknAmt) external {
+  function withdrawFee(uint wdAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
-    require(tknAmt <= feeAmt, "not-enough-insurance");
-    msg.sender.transfer(tknAmt);
-    feeAmt = sub(feeAmt, tknAmt);
-    emit LogWithdrawFee(tknAmt);
+    if (wdAmt > feeAmt) wdAmt = feeAmt;
+    msg.sender.transfer(wdAmt);
+    feeAmt = sub(feeAmt, wdAmt);
+    emit LogWithdrawFee(wdAmt);
   }
 
   /**
