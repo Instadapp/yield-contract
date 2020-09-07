@@ -117,7 +117,7 @@ contract Registry {
 
   /**
     * @dev update pool rate logic
-    * @param _token pool address
+    * @param _token token address
     * @param _newLogic new rate logic address
   */
   function updatePoolLogic(address _token, address _newLogic) external isMaster {
@@ -131,7 +131,7 @@ contract Registry {
 
   /**
     * @dev update flusher logic
-    * @param _token pool address
+    * @param _token token address
     * @param _newLogic new flusher logic address
   */
   function updateFlusherLogic(address _token, address _newLogic) external isMaster {
@@ -145,7 +145,7 @@ contract Registry {
 
   /**
     * @dev update pool fee
-    * @param _token pool address
+    * @param _token token address
     * @param _newFee new fee amount
   */
   function updateFee(address _token, uint _newFee) external isMaster {
@@ -159,7 +159,7 @@ contract Registry {
 
   /**
     * @dev update pool fee
-    * @param _token pool address
+    * @param _token token address
     * @param _newCap new fee amount
   */
   function updateCap(address _token, uint _newCap) external isMaster {
@@ -169,6 +169,11 @@ contract Registry {
     emit LogUpdateCap(_pool, _newCap);
   }
 
+  /**
+    * @dev adding settlement logic
+    * @param _token token address
+    * @param _logic logic proxy
+  */
   function addSettleLogic(address _token, address _logic) external isMaster {
     address _pool = poolToken[_token];
     require(_pool != address(0), "invalid-pool");
@@ -176,6 +181,11 @@ contract Registry {
     emit LogAddSettleLogic(_pool, _logic);
   }
 
+  /**
+    * @dev removing settlement logic
+    * @param _token token address
+    * @param _logic logic proxy
+  */
   function removeSettleLogic(address _token, address _logic) external isMaster {
     address _pool = poolToken[_token];
     require(_pool != address(0), "invalid-pool");
@@ -183,6 +193,10 @@ contract Registry {
     emit LogRemoveSettleLogic(_pool, _logic);
   }
 
+  /**
+    * @dev enable pool connector
+    * @param _connector logic proxy
+  */
   function enableConnector(address _connector) external isChief {
     require(!connectors[_connector], "already-enabled");
     require(_connector != address(0), "invalid-connector");
@@ -190,12 +204,20 @@ contract Registry {
     emit LogConnectorEnable(_connector);
   }
 
+  /**
+    * @dev disable pool connector
+    * @param _connector logic proxy
+  */
   function disableConnector(address _connector) external isChief {
     require(connectors[_connector], "already-disabled");
     delete connectors[_connector];
     emit LogConnectorDisable(_connector);
   }
 
+  /**
+    * @dev disable pool connector
+    * @param _connector logic proxy
+  */
   function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool isOk) {
     isOk = true;
     for (uint i = 0; i < _logics.length; i++) {
@@ -206,6 +228,10 @@ contract Registry {
     }
   }
 
+  /**
+    * @dev check if connectors are enabled
+    * @param _connectors array of logic proxy
+  */
   function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
     isOk = true;
     for (uint i = 0; i < _connectors.length; i++) {

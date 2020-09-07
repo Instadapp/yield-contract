@@ -3,13 +3,13 @@ pragma solidity ^0.6.8;
 
 contract Deployer {
 
-  mapping (address => bool) public isFlusher;
+  mapping (address => bool) public flushers;
 
-  event LogNewProxy(address indexed owner, address indexed logic);
+  event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
 
   // deploy create2 + minimal proxy
   function deployLogic(address owner, address logic) public returns (address proxy) {
-    require(!(isFlusherDeployed(getAddress(owner, logic))), "Flusher-already-deployed");
+    require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
     bytes32 salt = keccak256(abi.encodePacked(owner));
     bytes20 targetBytes = bytes20(logic);
     // solium-disable-next-line security/no-inline-assembly
@@ -26,8 +26,8 @@ contract Deployer {
       )
       proxy := create2(0, clone, 0x37, salt)
     }
-    isFlusher[proxy] = true;
-    emit LogNewProxy(owner, logic);
+    flushers[proxy] = true;
+    emit LogNewFlusher(owner, proxy, logic);
   }
 
   function isFlusherDeployed(address _address) public view returns (bool) {
