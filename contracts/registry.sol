@@ -14,27 +14,28 @@ contract Registry {
   event LogRemoveChief(address indexed chief);
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
-  event LogUpdatePool(address pool, bool poolState);
-  event LogUpdatePoolLogic(address pool, address newLogic);
-  event LogUpdateInsureFee(address pool, uint newFee);
-  event LogUpdateWithdrawalFee(address pool, uint newFee);
+  event LogUpdatePoolLogic(address token, address newLogic);
+  event LogUpdateFlusherLogic(address token, address newLogic);
+  event LogUpdateFee(address token, uint newFee);
+  event LogUpdateCap(address token, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
-  event LogNewDSA(address indexed pool, address indexed dsa);
-  event LogRemoveDSA(address indexed pool, address indexed dsa);
+  event LogAddSettleLogic(address indexed token, address indexed logic);
+  event LogRemoveSettleLogic(address indexed token, address indexed logic);
+  event LogConnectorEnable(address indexed connector);
+  event LogConnectorDisable(address indexed connector);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   mapping (address => bool) public chief;
   mapping (address => bool) public signer;
-  mapping (address => bool) public isPool;
   mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
+  mapping (address => address) public flusherLogic;
   mapping (address => uint) public poolCap;
-  mapping (address => uint) public insureFee;
-  mapping (address => uint) public withdrawalFee;
-  mapping (address => mapping(address => bool)) public isDsa; // pool => dsa => bool
-  mapping (address => address[]) public dsaArr; // pool => all dsa in array
+  mapping (address => uint) public fee;
+  mapping (address => mapping(address => bool)) public settleLogic;
+  mapping(address => bool) public connectors;
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -44,10 +45,6 @@ contract Registry {
   modifier isChief() {
     require(chief[msg.sender] || msg.sender == instaIndex.master(), "not-chief");
     _;
-  }
-
-  function getDsaLength(address _pool) external view returns(uint) {
-    return dsaArr[_pool].length;
   }
 
   /**
@@ -96,99 +93,153 @@ contract Registry {
 
   /**
     * @dev Add New Pool
-    * @param token ERC20 token address
+    * @param _token ERC20 token address
     * @param pool pool address
   */
-  function addPool(address token, address pool) external isMaster {
-    require(token != address(0) && pool != address(0), "invalid-address");
-    require(poolToken[token] == address(0), "pool-already-added");
-    poolToken[token] = pool;
-    emit LogAddPool(token, pool);
+  function addPool(address _token, address pool) external isMaster {
+    require(_token != address(0) && pool != address(0), "invalid-token-address");
+    require(poolToken[_token] == address(0), "pool-already-added");
+    poolToken[_token] = pool;
+    emit LogAddPool(_token, pool);
   }
 
   /**
     * @dev Remove Pool
-    * @param token ERC20 token address
+    * @param _token ERC20 token address
   */
-  function removePool(address token) external isMaster {
-    require(token != address(0), "invalid-address");
-    require(poolToken[token] != address(0), "pool-already-removed");
-    address poolAddr = poolToken[token];
-    delete poolToken[token];
-    emit LogRemovePool(token, poolAddr);
-  }
-
-  /**
-    * @dev enable / disable pool
-    * @param _pool pool address
-  */
-  function updatePool(address _pool) external isMaster {
-    isPool[_pool] = !isPool[_pool];
-    emit LogUpdatePool(_pool, isPool[_pool]);
+  function removePool(address _token) external isMaster {
+    require(_token != address(0), "invalid-token-address");
+    require(poolToken[_token] != address(0), "pool-already-removed");
+    address poolAddr = poolToken[_token];
+    delete poolToken[_token];
+    emit LogRemovePool(_token, poolAddr);
   }
 
   /**
     * @dev update pool rate logic
-    * @param _pool pool address
+    * @param _token token address
     * @param _newLogic new rate logic address
   */
-  function updatePoolLogic(address _pool, address _newLogic) external isMaster {
-    require(isPool[_pool], "not-pool");
+  function updatePoolLogic(address _token, address _newLogic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
     require(_newLogic != address(0), "invalid-address");
-    require( poolLogic[_pool] != _newLogic, "same-pool-logic");
+    require(poolLogic[_pool] != _newLogic, "same-pool-logic");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
   }
 
   /**
-    * @dev update pool insure fee 
-    * @param _pool pool address
+    * @dev update flusher logic
+    * @param _token token address
+    * @param _newLogic new flusher logic address
+  */
+  function updateFlusherLogic(address _token, address _newLogic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    require(_newLogic != address(0), "invalid-address");
+    require(flusherLogic[_pool] != _newLogic, "same-pool-logic");
+    flusherLogic[_pool] = _newLogic;
+    emit LogUpdateFlusherLogic(_pool, _newLogic);
+  }
+
+  /**
+    * @dev update pool fee
+    * @param _token token address
     * @param _newFee new fee amount
   */
-  function updateInsureFee(address _pool, uint _newFee) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(_newFee < 10 ** 18, "insure-fee-limit-reached");
-    require(insureFee[_pool] != _newFee, "same-pool-fee");
-    insureFee[_pool] = _newFee;
-    emit LogUpdateInsureFee(_pool, _newFee);
+  function updateFee(address _token, uint _newFee) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    require(_newFee < 3 * 10 ** 17, "insure-fee-limit-reached");
+    require(fee[_pool] != _newFee, "same-pool-fee");
+    fee[_pool] = _newFee;
+    emit LogUpdateFee(_pool, _newFee);
   }
 
   /**
-    * @dev update pool withdrawal fee 
-    * @param _pool pool address
-    * @param _newFee new withdrawal fee amount
+    * @dev update pool fee
+    * @param _token token address
+    * @param _newCap new fee amount
   */
-  function updateWithdrawalFee(address _pool, uint _newFee) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(_newFee < 1 * 10 ** 16, "withdrawal-fee-limit-reached");
-    require(withdrawalFee[_pool] != _newFee, "same-pool-fee");
-    withdrawalFee[_pool] = _newFee;
-    emit LogUpdateWithdrawalFee(_pool, _newFee);
+  function updateCap(address _token, uint _newCap) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    poolCap[_pool] = _newCap;
+    emit LogUpdateCap(_pool, _newCap);
   }
 
   /**
-    * @dev add dsa for a pool 
-    * @param _pool pool address
-    * @param _dsa DSA address
+    * @dev adding settlement logic
+    * @param _token token address
+    * @param _logic logic proxy
   */
-  function addDsa(address _pool, address _dsa) external isMaster {
-    require(isPool[_pool], "not-pool");
-    if (_dsa == address(0)) _dsa = instaIndex.build(_pool, 1, address(this));
-    isDsa[_pool][_dsa] = true;
-    dsaArr[_pool].push(_dsa);
-    emit LogNewDSA(_pool, _dsa);
+  function addSettleLogic(address _token, address _logic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    settleLogic[_pool][_logic] = true;
+    emit LogAddSettleLogic(_pool, _logic);
   }
 
   /**
-    * @dev remove dsa from a pool 
-    * @param _pool pool address
-    * @param _dsa DSA address
+    * @dev removing settlement logic
+    * @param _token token address
+    * @param _logic logic proxy
   */
-  function removeDsa(address _pool, address _dsa) external isMaster {
-    require(isPool[_pool], "not-pool");
-    require(isDsa[_pool][_dsa], "not-dsa-for-pool");
-    delete isDsa[_pool][_dsa];
-    emit LogRemoveDSA(_pool, _dsa);
+  function removeSettleLogic(address _token, address _logic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    delete settleLogic[_pool][_logic];
+    emit LogRemoveSettleLogic(_pool, _logic);
+  }
+
+  /**
+    * @dev enable pool connector
+    * @param _connector logic proxy
+  */
+  function enableConnector(address _connector) external isChief {
+    require(!connectors[_connector], "already-enabled");
+    require(_connector != address(0), "invalid-connector");
+    connectors[_connector] = true;
+    emit LogConnectorEnable(_connector);
+  }
+
+  /**
+    * @dev disable pool connector
+    * @param _connector logic proxy
+  */
+  function disableConnector(address _connector) external isChief {
+    require(connectors[_connector], "already-disabled");
+    delete connectors[_connector];
+    emit LogConnectorDisable(_connector);
+  }
+
+  /**
+    * @dev disable pool connector
+    * @param _connector logic proxy
+  */
+  function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool isOk) {
+    isOk = true;
+    for (uint i = 0; i < _logics.length; i++) {
+      if (!settleLogic[_pool][_logics[i]]) {
+        isOk = false;
+        break;
+      }
+    }
+  }
+
+  /**
+    * @dev check if connectors are enabled
+    * @param _connectors array of logic proxy
+  */
+  function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
+    isOk = true;
+    for (uint i = 0; i < _connectors.length; i++) {
+      if (!connectors[_connectors[i]]) {
+        isOk = false;
+        break;
+      }
+    }
   }
 
   constructor(address _chief) public {
