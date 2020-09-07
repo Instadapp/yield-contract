@@ -10,12 +10,12 @@ import { DSMath } from "../libs/safeMath.sol";
 
 interface IndexInterface {
   function master() external view returns (address);
-  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
+  function flusherLogic(address) external returns (address);
   function fee(address) external view returns (uint);
   function poolCap(address) external view returns (uint);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
@@ -23,6 +23,10 @@ interface RegistryInterface {
 
 interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
+}
+
+interface FlusherLogicInterface {
+  function isFlusher(address) external returns (bool);
 }
 
 contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
@@ -33,7 +37,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
   event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt);
   event LogWithdrawFee(uint amount);
-  event LogPausePool(bool);
 
   IERC20 public immutable baseToken; // Base token.
   RegistryInterface public immutable registry; // Pool Registry
@@ -57,6 +60,11 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     _;
   }
 
+  modifier isFlusher() {
+    require(FlusherLogicInterface(registry.flusherLogic(address(this))).isFlusher(msg.sender), "not-flusher");
+    _;
+  }
+
   /**
     * @dev get pool token rate
     * @param tokenAmt total token amount
@@ -66,7 +74,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   }
 
   /**
-    * @dev sets exchange rates
+    * @dev sets exchange rate
     */
   function setExchangeRate() public {
     require(msg.sender == address(this), "not-pool-address");
@@ -74,12 +82,11 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, feeAmt);
     uint _newRate = getCurrentRate(_totalToken);
-    uint _tokenBal;
     require(_newRate != 0, "current-rate-is-zero");
+    uint _tokenBal = wdiv(totalSupply(), _prevRate);
     if (_newRate > _prevRate) {
       _newRate = _prevRate;
     } else {
-      _tokenBal = wdiv(totalSupply(), _prevRate);
       uint _newFee = wmul(sub(_totalToken, _tokenBal), registry.fee(address(this)));
       feeAmt = add(feeAmt, _newFee);
       _tokenBal = sub(_totalToken, _newFee);
@@ -128,11 +135,11 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) public whenNotPaused payable returns (uint mintAmt) {
+  function deposit(uint tknAmt) public whenNotPaused payable isFlusher returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
-    require(_newTknBal < registry.poolCap(address(this)), "unmatched-amount");
+    require(_newTknBal < registry.poolCap(address(this)), "pool-cap-reached");
     mintAmt = wmul(msg.value, exchangeRate);
     _mint(msg.sender, mintAmt);
     emit LogDeposit(msg.sender, tknAmt, mintAmt);

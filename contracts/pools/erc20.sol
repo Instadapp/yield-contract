@@ -10,12 +10,12 @@ import { DSMath } from "../libs/safeMath.sol";
 
 interface IndexInterface {
   function master() external view returns (address);
-  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
+  function flusherLogic(address) external returns (address);
   function fee(address) external view returns (uint);
   function poolCap(address) external view returns (uint);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
@@ -25,17 +25,18 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
+interface FlusherLogicInterface {
+  function isFlusher(address) external returns (bool);
+}
+
+contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   using SafeERC20 for IERC20;
 
-  event LogDeploy(address indexed dsa, address token, uint amount);
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
   event LogDeposit(address indexed user, uint depositAmt, uint poolMintAmt);
   event LogWithdraw(address indexed user, uint withdrawAmt, uint poolBurnAmt);
-  event LogAddFee(uint amount);
   event LogWithdrawFee(uint amount);
-  event LogPausePool(bool);
 
   IERC20 public immutable baseToken; // Base token. Eg:- DAI, USDC, etc.
   RegistryInterface public immutable registry; // Pool Registry
@@ -45,54 +46,59 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
   uint public feeAmt; // fee collected on profits
 
   constructor(
-      address _registry,
-      string memory _name,
-      string memory _symbol,
-      address _baseToken
+    address _registry,
+    string memory _name,
+    string memory _symbol,
+    address _baseToken
   ) public ERC20(_name, _symbol) {
-      baseToken = IERC20(_baseToken);
-      registry = RegistryInterface(_registry);
-      exchangeRate = 10 ** uint(36 - ERC20(_baseToken).decimals());
+    baseToken = IERC20(_baseToken);
+    registry = RegistryInterface(_registry);
+    exchangeRate = 10 ** uint(36 - ERC20(_baseToken).decimals());
   }
 
   modifier isChief() {
-      require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
-      _;
+    require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
+    _;
+  }
+
+  modifier isFlusher() {
+    require(FlusherLogicInterface(registry.flusherLogic(address(this))).isFlusher(msg.sender), "not-flusher");
+    _;
   }
 
   /**
     * @dev get pool token rate
     * @param tokenAmt total token amount
-    */
+  */
   function getCurrentRate(uint tokenAmt) internal view returns (uint) {
     return wdiv(totalSupply(), tokenAmt);
   }
 
   /**
-    * @dev sets exchange rates
+    * @dev sets exchange rate
     */
   function setExchangeRate() public {
     require(msg.sender == address(this), "not-pool-address");
-    uint _previousRate = exchangeRate;
+    uint _prevRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, feeAmt);
-    uint _currentRate = getCurrentRate(_totalToken);
-    uint _tokenBal;
-    require(_currentRate != 0, "current-rate-is-zero");
-    if (_currentRate > _previousRate) { // loss => deduct partially/fully from insurance amount
-        _currentRate = _previousRate;
-    } else { // profit => add to insurance amount
+    uint _newRate = getCurrentRate(_totalToken);
+    require(_newRate != 0, "current-rate-is-zero");
+    uint _tokenBal = wdiv(totalSupply(), _prevRate);
+    if (_newRate > _prevRate) {
+      _newRate = _prevRate;
+    } else {
       uint _newFee = wmul(sub(_totalToken, _tokenBal), registry.fee(address(this)));
       feeAmt = add(feeAmt, _newFee);
       _tokenBal = sub(_totalToken, _newFee);
-      _currentRate = getCurrentRate(_tokenBal);
+      _newRate = getCurrentRate(_tokenBal);
     }
-    exchangeRate = _currentRate;
+    exchangeRate = _newRate;
     emit LogExchangeRate(exchangeRate, _tokenBal, feeAmt);
   }
 
   /**
-    * @dev Delegate the calls to Connector And this function is ran by cast().
+    * @dev delegate the calls to connector and this function is ran by settle()
     * @param _target Target to of Connector.
     * @param _data CallData of function in Connector.
   */
@@ -128,48 +134,48 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
   /**
     * @dev Deposit token.
     * @param tknAmt token amount
-    * @return _mintAmt amount of wrap token minted
+    * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) external whenNotPaused payable returns (uint _mintAmt) {
+  function deposit(uint tknAmt) public payable whenNotPaused isFlusher returns (uint mintAmt) {
     require(msg.value == 0, "non-eth-pool");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
-    require(_newTknBal < registry.poolCap(address(this)), "unmatched-amount");
+    require(_newTknBal < registry.poolCap(address(this)), "pool-cap-reached");
     baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-    _mintAmt = wmul(tknAmt, exchangeRate);
-    _mint(msg.sender, _mintAmt);
-    emit LogDeposit(msg.sender, tknAmt, _mintAmt);
+    mintAmt = wmul(tknAmt, exchangeRate);
+    _mint(msg.sender, mintAmt);
+    emit LogDeposit(msg.sender, tknAmt, mintAmt);
   }
 
   /**
     * @dev Withdraw tokens.
     * @param tknAmt token amount
-    * @param to withdraw tokens to address
-    * @return _tknAmt amount of token withdrawn
+    * @param target withdraw tokens to address
+    * @return wdAmt amount of token withdrawn
   */
-  function withdraw(uint tknAmt, address to) external nonReentrant whenNotPaused returns (uint _tknAmt) {
-    require(to != address(0), "to-address-not-vaild");
+  function withdraw(uint tknAmt, address target) external nonReentrant whenNotPaused returns (uint wdAmt) {
+    require(target != address(0), "invalid-target-address");
     uint _userBal = wdiv(balanceOf(msg.sender), exchangeRate);
     uint _burnAmt;
     if (tknAmt >= _userBal) {
       _burnAmt = balanceOf(msg.sender);
-      _tknAmt = _userBal;
+      wdAmt = _userBal;
     } else {
       _burnAmt = wmul(tknAmt, exchangeRate);
-      _tknAmt = tknAmt;
+      wdAmt = tknAmt;
     }
-    require(_tknAmt <= baseToken.balanceOf(address(this)), "not-enough-liquidity-available");
+    require(wdAmt <= baseToken.balanceOf(address(this)), "not-enough-liquidity-available");
 
     _burn(msg.sender, _burnAmt);
-    baseToken.safeTransfer(to, _tknAmt);
+    baseToken.safeTransfer(target, wdAmt);
 
-    emit LogWithdraw(msg.sender, _tknAmt, _burnAmt);
+    emit LogWithdraw(msg.sender, wdAmt, _burnAmt);
   }
 
   /**
-    * @dev Withdraw Insurance from the pool.
-    * @notice only master can call this function.
-    * @param wdAmt insurance token amount to remove
+    * @dev withdraw fee from the pool
+    * @notice only master can call this function
+    * @param wdAmt fee amount to withdraw
   */
   function withdrawFee(uint wdAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -189,5 +195,4 @@ contract PoolToken is ReentrancyGuard, DSMath, ERC20Pausable {
   }
 
   receive() external payable {}
-
 }

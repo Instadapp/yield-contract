@@ -15,12 +15,15 @@ contract Registry {
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
   event LogUpdatePoolLogic(address token, address newLogic);
+  event LogUpdateFlusherLogic(address token, address newLogic);
   event LogUpdateFee(address token, uint newFee);
   event LogUpdateCap(address token, uint newFee);
   event LogAddPool(address indexed token, address indexed pool);
   event LogRemovePool(address indexed token, address indexed pool);
   event LogAddSettleLogic(address indexed token, address indexed logic);
   event LogRemoveSettleLogic(address indexed token, address indexed logic);
+  event LogConnectorEnable(address indexed connector);
+  event LogConnectorDisable(address indexed connector);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
@@ -28,9 +31,11 @@ contract Registry {
   mapping (address => bool) public signer;
   mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
+  mapping (address => address) public flusherLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public fee;
   mapping (address => mapping(address => bool)) public settleLogic;
+  mapping(address => bool) public connectors;
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -125,6 +130,20 @@ contract Registry {
   }
 
   /**
+    * @dev update flusher logic
+    * @param _token pool address
+    * @param _newLogic new flusher logic address
+  */
+  function updateFlusherLogic(address _token, address _newLogic) external isMaster {
+    address _pool = poolToken[_token];
+    require(_pool != address(0), "invalid-pool");
+    require(_newLogic != address(0), "invalid-address");
+    require(flusherLogic[_pool] != _newLogic, "same-pool-logic");
+    flusherLogic[_pool] = _newLogic;
+    emit LogUpdateFlusherLogic(_pool, _newLogic);
+  }
+
+  /**
     * @dev update pool fee
     * @param _token pool address
     * @param _newFee new fee amount
@@ -164,13 +183,37 @@ contract Registry {
     emit LogRemoveSettleLogic(_pool, _logic);
   }
 
-  function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool) {
+  function enableConnector(address _connector) external isChief {
+    require(!connectors[_connector], "already-enabled");
+    require(_connector != address(0), "invalid-connector");
+    connectors[_connector] = true;
+    emit LogConnectorEnable(_connector);
+  }
+
+  function disableConnector(address _connector) external isChief {
+    require(connectors[_connector], "already-disabled");
+    delete connectors[_connector];
+    emit LogConnectorDisable(_connector);
+  }
+
+  function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool isOk) {
+    isOk = true;
     for (uint i = 0; i < _logics.length; i++) {
       if (!settleLogic[_pool][_logics[i]]) {
-        return false;
+        isOk = false;
+        break;
       }
     }
-    return true;
+  }
+
+  function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
+    isOk = true;
+    for (uint i = 0; i < _connectors.length; i++) {
+      if (!connectors[_connectors[i]]) {
+        isOk = false;
+        break;
+      }
+    }
   }
 
   constructor(address _chief) public {
