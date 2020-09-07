@@ -22,8 +22,8 @@ contract Registry {
   event LogRemovePool(address indexed token, address indexed pool);
   event LogAddSettleLogic(address indexed token, address indexed logic);
   event LogRemoveSettleLogic(address indexed token, address indexed logic);
-  event LogConnectorEnable(address indexed connector);
-  event LogConnectorDisable(address indexed connector);
+  event LogFlusherConnectorsEnable(address indexed connector);
+  event LogflusherConnectorsDisable(address indexed connector);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
@@ -35,7 +35,7 @@ contract Registry {
   mapping (address => uint) public poolCap;
   mapping (address => uint) public fee;
   mapping (address => mapping(address => bool)) public settleLogic;
-  mapping(address => bool) public connectors;
+  mapping(address => bool) public flusherConnectors;
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -198,9 +198,9 @@ contract Registry {
     * @param _connector logic proxy
   */
   function enableConnector(address _connector) external isChief {
-    require(!connectors[_connector], "already-enabled");
+    require(!flusherConnectors[_connector], "already-enabled");
     require(_connector != address(0), "invalid-connector");
-    connectors[_connector] = true;
+    flusherConnectors[_connector] = true;
     emit LogConnectorEnable(_connector);
   }
 
@@ -209,8 +209,8 @@ contract Registry {
     * @param _connector logic proxy
   */
   function disableConnector(address _connector) external isChief {
-    require(connectors[_connector], "already-disabled");
-    delete connectors[_connector];
+    require(flusherConnectors[_connector], "already-disabled");
+    delete flusherConnectors[_connector];
     emit LogConnectorDisable(_connector);
   }
 
@@ -235,7 +235,7 @@ contract Registry {
   function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
     isOk = true;
     for (uint i = 0; i < _connectors.length; i++) {
-      if (!connectors[_connectors[i]]) {
+      if (!flusherConnectors[_connectors[i]]) {
         isOk = false;
         break;
       }
