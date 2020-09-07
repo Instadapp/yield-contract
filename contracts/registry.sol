@@ -5,7 +5,6 @@ pragma experimental ABIEncoderV2;
 
 interface IndexInterface {
   function master() external view returns (address);
-  function build(address _owner, uint accountVersion, address _origin) external returns (address _account);
 }
 
 contract Registry {
@@ -215,8 +214,9 @@ contract Registry {
   }
 
   /**
-    * @dev disable pool connector
-    * @param _connector logic proxy
+    * @dev check if settle logics are enabled
+    * @param _pool token pool address
+    * @param _logics array of logic proxy
   */
   function checkSettleLogics(address _pool, address[] calldata _logics) external view returns(bool isOk) {
     isOk = true;
