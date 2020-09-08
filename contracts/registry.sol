@@ -73,10 +73,10 @@ contract Registry {
     * @param _signer Address of the new signer.
   */
   function enableSigner(address _signer) external isChief {
-      require(_signer != address(0), "invalid-address");
-      require(!signer[_signer], "signer-already-enabled");
-      signer[_signer] = true;
-      emit LogAddSigner(_signer);
+    require(_signer != address(0), "invalid-address");
+    require(!signer[_signer], "signer-already-enabled");
+    signer[_signer] = true;
+    emit LogAddSigner(_signer);
   }
 
   /**
@@ -84,10 +84,10 @@ contract Registry {
     * @param _signer Address of the existing signer.
   */
   function disableSigner(address _signer) external isChief {
-      require(_signer != address(0), "invalid-address");
-      require(signer[_signer], "signer-already-disabled");
-      delete signer[_signer];
-      emit LogRemoveSigner(_signer);
+    require(_signer != address(0), "invalid-address");
+    require(signer[_signer], "signer-already-disabled");
+    delete signer[_signer];
+    emit LogRemoveSigner(_signer);
   }
 
   /**
