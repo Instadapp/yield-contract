@@ -66,14 +66,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   }
 
   /**
-    * @dev get pool token rate
-    * @param tokenAmt total token amount
-  */
-  function getCurrentRate(uint tokenAmt) internal view returns (uint) {
-    return wdiv(totalSupply(), tokenAmt);
-  }
-
-  /**
     * @dev sets exchange rate
     */
   function setExchangeRate() public {
@@ -81,7 +73,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     uint _prevRate = exchangeRate;
     uint _totalToken = RateInterface(registry.poolLogic(address(this))).getTotalToken();
     _totalToken = sub(_totalToken, feeAmt);
-    uint _newRate = getCurrentRate(_totalToken);
+    uint _newRate = wdiv(totalSupply(), _totalToken);
     require(_newRate != 0, "current-rate-is-zero");
     uint _tokenBal = wdiv(totalSupply(), _prevRate);
     if (_newRate > _prevRate) {
@@ -90,7 +82,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
       uint _newFee = wmul(sub(_totalToken, _tokenBal), registry.fee(address(this)));
       feeAmt = add(feeAmt, _newFee);
       _tokenBal = sub(_totalToken, _newFee);
-      _newRate = getCurrentRate(_tokenBal);
+      _newRate = wdiv(totalSupply(), _tokenBal);
     }
     exchangeRate = _newRate;
     emit LogExchangeRate(exchangeRate, _tokenBal, feeAmt);
@@ -101,7 +93,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param _target Target to of Connector.
     * @param _data CallData of function in Connector.
   */
-  function spell(address _target, bytes memory _data) internal {
+  function spell(address _target, bytes memory _data) private {
     require(_target != address(0), "target-invalid");
     assembly {
       let succeeded := delegatecall(gas(), _target, add(_data, 0x20), mload(_data), 0, 0)
