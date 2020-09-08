@@ -3,10 +3,27 @@ pragma solidity ^0.6.8;
 
 contract EthRateLogic {
     address poolToken;
+
+    function getCompoundNetAssetsInEth(address _dsa) private returns (uint _netBal) {
+        // Logics
+        // Take price from Compound's Oracle?
+    }
+
+    function getCurveNetAssetsInEth(address _dsa) private returns (uint _netBal) {
+        // Logics
+        // Take price from ChainLink's Oracle?
+    }
+
+    function getNetDsaAssets(address _dsa) private returns (uint _netBal) {
+        _netBal = _dsa.balance;
+        _netBal += getCompoundNetAssetsInEth(_dsa);
+        _netBal += getCurveNetAssetsInEth(_dsa);
+    }
     
     function getTotalToken() public returns (uint) {
-        uint bal = (address(this).balance);
-        bal += (address(poolToken).balance);
+        address _dsa = 0x0000000000000000000000000000000000000000;
+        uint bal = poolToken.balance;
+        bal += getNetDsaAssets(_dsa);
         return bal;
     }
 
