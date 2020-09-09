@@ -4,6 +4,8 @@ const { expect } = require('chai');
 const RegistryContract = artifacts.require("Registry");
 const PoolETHContract = artifacts.require("PoolETH");
 
+const FlusherLogic = artifacts.require("FlusherLogic");
+const SettleLogic = artifacts.require("SettleLogic");
 const EthRateLogic = artifacts.require("EthRateLogic");
 
 
@@ -21,11 +23,15 @@ contract('ETH Pool', async accounts => {
     let registryInstance;
 
     let ethRateLogicInstance;
+    let flusherLogicInstance;
+    let settleLogicInstance;
     before(async() => {
         registryInstance = await RegistryContract.deployed();
         ethPoolInstance = await PoolETHContract.deployed();
 
         ethRateLogicInstance = await EthRateLogic.deployed();
+        flusherLogicInstance = await FlusherLogic.deployed();
+        settleLogicInstance = await SettleLogic.deployed();
     })
 
   it('should send ether to the master address', async () => {
@@ -43,12 +49,21 @@ contract('ETH Pool', async accounts => {
     await addPool(registryInstance, ethPoolInstance.address, ethAddr);
   });
 
-  it('should enable ETH pool in registry', async () => {
-      await enablePool(registryInstance, ethPoolInstance.address);
+  it('should update ETH Logic contract in registry', async () => {
+      await updateRateLogic(registryInstance, ethPoolInstance.address, ethAddr, ethRateLogicInstance.address);
   });
 
-  it('should update ETH Logic contract in registry', async () => {
-      await updateRateLogic(registryInstance, ethPoolInstance.address, ethRateLogicInstance.address);
+  it('should update Flusher Logic contract in registry for ETH POOL', async () => {
+    await updateFlusherLogic(registryInstance, ethPoolInstance.address, ethAddr, flusherLogicInstance.address);
+  });
+
+  it('should update Settle Logic contract in registry for ETH POOL', async () => {
+    await updateSettleLogic(registryInstance, ethPoolInstance.address, ethAddr, settleLogicInstance.address);
+  });
+
+  it('should update Pool Cap in registry for ETH POOL', async () => {
+    var amountInWei = (ether("100000000")).toString()
+    await updatePoolCap(registryInstance, ethPoolInstance.address, ethAddr, amountInWei);
   });
 
   it('should deposit 5 ETH in ETH pool', async () => {
@@ -68,7 +83,7 @@ contract('ETH Pool', async accounts => {
         value: amountInWei
       });
     var exchangeRateInit =  await ethPoolInstance.exchangeRate()
-    await ethPoolInstance.setExchangeRate({from: masterAddr});
+    await updateExchangeLogic(ethPoolInstance, settleLogicInstance.address);
     var exchangeRateFinal =  await ethPoolInstance.exchangeRate()
     expect(exchangeRateInit).to.not.equal(exchangeRateFinal);
   });
@@ -111,9 +126,48 @@ async function enablePool(registryInstance, poolAddr) {
  expect(_isPool).to.equal(true);
 }
 
-async function updateRateLogic(registryInstance, poolAddr, logicAddr) {
-  await registryInstance.updatePoolLogic(poolAddr, logicAddr, {from: masterAddr});
+async function updateRateLogic(registryInstance, poolAddr, tokenAddr, logicAddr) {
+  await registryInstance.updatePoolLogic(tokenAddr, logicAddr, {from: masterAddr});
 
   var _logicAddr = await registryInstance.poolLogic(poolAddr);
   expect(_logicAddr).to.equal(logicAddr);
+}
+
+async function updatePoolCap(registryInstance, poolAddr, tokenAddr, capAmt) {
+  await registryInstance.updateCap(tokenAddr, capAmt, {from: masterAddr});
+
+  var _capAmt = await registryInstance.poolCap(poolAddr);
+  expect(new BN(_capAmt)).to.bignumber.equal(capAmt);
+}
+
+async function updateFlusherLogic(registryInstance, poolAddr, tokenAddr, flusherLogic) {
+  await registryInstance.updateFlusherLogic(tokenAddr, flusherLogic, {from: masterAddr});
+
+  var _logicAddr = await registryInstance.flusherLogic(poolAddr);
+  expect(_logicAddr).to.equal(flusherLogic);
+}
+
+async function updateSettleLogic(registryInstance, poolAddr, tokenAddr, settleLogic) {
+  await registryInstance.addSettleLogic(tokenAddr, settleLogic, {from: masterAddr});
+
+  var _isSettleLogic = await registryInstance.settleLogic(poolAddr, settleLogic);
+  expect(_isSettleLogic).to.equal(true);
+}
+
+async function updateExchangeLogic(ethPoolInstance, settleLogic) {
+  var abi = {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "pool",
+            "type": "address"
+          }
+        ],
+        "name": "calculateExchangeRate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+  }
+  var encodeCalldata = web3.eth.abi.encodeFunctionCall(abi, [ethPoolInstance.address]);
+  await ethPoolInstance.settle([settleLogic], [encodeCalldata], {from: masterAddr});
 }
