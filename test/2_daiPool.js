@@ -7,6 +7,8 @@ const PoolETHContract = artifacts.require("PoolETH");
 
 const DaiRateLogic = artifacts.require("DaiRateLogic");
 const EthRateLogic = artifacts.require("EthRateLogic");
+const FlusherLogic = artifacts.require("FlusherLogic");
+const SettleLogic = artifacts.require("SettleLogic");
 
 
 const masterAddr = "0xfCD22438AD6eD564a1C26151Df73F6B33B817B56"
@@ -31,6 +33,8 @@ contract('DAI Pool', async accounts => {
 
     let ethRateLogicInstance;
     let daiRateLogicInstance;
+    let flusherLogicInstance;
+    let settleLogicInstance;
     before(async() => {
         registryInstance = await RegistryContract.deployed();
         ethPoolInstance = await PoolETHContract.deployed();
@@ -38,6 +42,8 @@ contract('DAI Pool', async accounts => {
 
         ethRateLogicInstance = await EthRateLogic.deployed();
         daiRateLogicInstance = await DaiRateLogic.deployed();
+        flusherLogicInstance = await FlusherLogic.deployed();
+        settleLogicInstance = await SettleLogic.deployed();
     })
 
   it('should send ether to the user address', async () => {
@@ -74,12 +80,21 @@ contract('DAI Pool', async accounts => {
     await addPool(registryInstance, daiPoolInstance.address, daiAddr);
   });
 
-  it('should enable DAI pool in registry', async () => {
-      await enablePool(registryInstance, daiPoolInstance.address);
+  it('should update DAI Logic contract in registry', async () => {
+      await updateRateLogic(registryInstance, daiPoolInstance.address, daiAddr, daiRateLogicInstance.address);
   });
 
-  it('should update DAI Logic contract in registry', async () => {
-      await updateRateLogic(registryInstance, daiPoolInstance.address, daiRateLogicInstance.address);
+  it('should update Flusher Logic contract in registry for DAI POOL', async () => {
+    await updateFlusherLogic(registryInstance, daiPoolInstance.address, daiAddr, flusherLogicInstance.address);
+  });
+
+  it('should update Settle Logic contract in registry for DAI POOL', async () => {
+    await updateSettleLogic(registryInstance, daiPoolInstance.address, daiAddr, settleLogicInstance.address);
+  });
+
+  it('should update Pool Cap in registry for DAI POOL', async () => {
+    var amountInWei = (ether("100000000")).toString()
+    await updatePoolCap(registryInstance, daiPoolInstance.address, daiAddr, amountInWei);
   });
 
   it('should give DAI allowance for DAI pool', async () => {
@@ -105,7 +120,7 @@ contract('DAI Pool', async accounts => {
     .transfer(daiRateLogicInstance.address, amountInWei)
     .send({ from: userAddress});
     var exchangeRateInit =  await daiPoolInstance.exchangeRate()
-    await daiPoolInstance.setExchangeRate({from: masterAddr});
+    await updateExchangeLogic(daiPoolInstance, settleLogicInstance.address);
     var exchangeRateFinal =  await daiPoolInstance.exchangeRate()
     expect(exchangeRateInit).to.not.equal(exchangeRateFinal);
   });
@@ -149,16 +164,48 @@ async function addPool(registryInstance, poolAddr, tokenAddr) {
   expect(_poolAddr).to.equal(poolAddr);
 }
 
-async function enablePool(registryInstance, poolAddr) {
- await registryInstance.updatePool(poolAddr, {from: masterAddr});
- 
- var _isPool = await registryInstance.isPool(poolAddr);
- expect(_isPool).to.equal(true);
+async function updatePoolCap(registryInstance, poolAddr, tokenAddr, capAmt) {
+  await registryInstance.updateCap(tokenAddr, capAmt, {from: masterAddr});
+
+  var _capAmt = await registryInstance.poolCap(poolAddr);
+  expect(new BN(_capAmt)).to.bignumber.equal(capAmt);
 }
 
-async function updateRateLogic(registryInstance, poolAddr, logicAddr) {
-  await registryInstance.updatePoolLogic(poolAddr, logicAddr, {from: masterAddr});
+async function updateRateLogic(registryInstance, poolAddr, tokenAddr, logicAddr) {
+  await registryInstance.updatePoolLogic(tokenAddr, logicAddr, {from: masterAddr});
 
   var _logicAddr = await registryInstance.poolLogic(poolAddr);
   expect(_logicAddr).to.equal(logicAddr);
+}
+
+async function updateFlusherLogic(registryInstance, poolAddr, tokenAddr, flusherLogic) {
+  await registryInstance.updateFlusherLogic(tokenAddr, flusherLogic, {from: masterAddr});
+
+  var _logicAddr = await registryInstance.flusherLogic(poolAddr);
+  expect(_logicAddr).to.equal(flusherLogic);
+}
+
+async function updateSettleLogic(registryInstance, poolAddr, tokenAddr, settleLogic) {
+  await registryInstance.addSettleLogic(tokenAddr, settleLogic, {from: masterAddr});
+
+  var _isSettleLogic = await registryInstance.settleLogic(poolAddr, settleLogic);
+  expect(_isSettleLogic).to.equal(true);
+}
+
+async function updateExchangeLogic(daiPoolInstance, settleLogic) {
+  var abi = {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "pool",
+            "type": "address"
+          }
+        ],
+        "name": "calculateExchangeRate",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+  }
+  var encodeCalldata = web3.eth.abi.encodeFunctionCall(abi, [daiPoolInstance.address]);
+  await daiPoolInstance.settle([settleLogic], [encodeCalldata], {from: masterAddr});
 }
