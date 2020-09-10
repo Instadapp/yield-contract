@@ -48,40 +48,24 @@ contract('Registry.sol', async accounts => {
         await addPool(registryInstance, ethPoolInstance.address, ethAddr);
     });
 
-    it('should enable ETH pool in registry', async () => {
-        await enablePool(registryInstance, ethPoolInstance.address);
-    });
-
     it('should remove ETH pool in registry', async () => {
         await removePool(registryInstance, ethAddr);
-    });
-
-    it('should disable ETH pool in registry', async () => {
-        await disablePool(registryInstance, ethPoolInstance.address);
     });
 
     it('should add ETH pool in registry', async () => {
         await addPool(registryInstance, ethPoolInstance.address, ethAddr);
     });
 
-    it('should enable ETH pool in registry', async () => {
-        await enablePool(registryInstance, ethPoolInstance.address);
-    });
-
     it('should add DAI pool in registry', async () => {
         await addPool(registryInstance, daiPoolInstance.address, daiAddr);
     });
 
-    it('should enable DAI pool in registry', async () => {
-        await enablePool(registryInstance, daiPoolInstance.address);
-    });
-
     it('should update ETH Logic contract in registry', async () => {
-        await updateRateLogic(registryInstance, ethPoolInstance.address, ethRateLogicInstance.address);
+        await updateRateLogic(registryInstance, ethPoolInstance.address, ethAddr, ethRateLogicInstance.address);
     });
 
     it('should update DAI Logic contract in registry', async () => {
-        await updateRateLogic(registryInstance, daiPoolInstance.address, daiRateLogicInstance.address);
+        await updateRateLogic(registryInstance, daiPoolInstance.address, daiAddr, daiRateLogicInstance.address);
     });
 });
 
@@ -100,22 +84,8 @@ async function removePool(registryInstance, tokenAddr) {
 }
 
 
-async function enablePool(registryInstance, poolAddr) {
-   await registryInstance.updatePool(poolAddr, {from: masterAddr});
-   
-   var _isPool = await registryInstance.isPool(poolAddr);
-   expect(_isPool).to.equal(true);
-}
-
-async function disablePool(registryInstance, poolAddr) {
-    await registryInstance.updatePool(poolAddr, {from: masterAddr});
-    
-    var _isPool = await registryInstance.isPool(poolAddr);
-    expect(_isPool).to.equal(false);
- }
-
-async function updateRateLogic(registryInstance, poolAddr, logicAddr) {
-    await registryInstance.updatePoolLogic(poolAddr, logicAddr, {from: masterAddr});
+async function updateRateLogic(registryInstance, poolAddr, tokenAddr, logicAddr) {
+    await registryInstance.updatePoolLogic(tokenAddr, logicAddr, {from: masterAddr});
 
     var _logicAddr = await registryInstance.poolLogic(poolAddr);
     expect(_logicAddr).to.equal(logicAddr);
