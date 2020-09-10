@@ -17,8 +17,6 @@ contract Registry {
   event LogUpdateFlusherLogic(address token, address newLogic);
   event LogUpdateFee(address token, uint newFee);
   event LogUpdateCap(address token, uint newFee);
-  event LogAddPool(address indexed token, address indexed pool);
-  event LogRemovePool(address indexed token, address indexed pool);
   event LogAddSettleLogic(address indexed token, address indexed logic);
   event LogRemoveSettleLogic(address indexed token, address indexed logic);
   event LogFlusherConnectorsEnable(address indexed connector);
@@ -28,7 +26,6 @@ contract Registry {
 
   mapping (address => bool) public chief;
   mapping (address => bool) public signer;
-  mapping (address => address) public poolToken;
   mapping (address => address) public poolLogic;
   mapping (address => address) public flusherLogic;
   mapping (address => uint) public poolCap;
@@ -91,36 +88,11 @@ contract Registry {
   }
 
   /**
-    * @dev Add New Pool
-    * @param _token ERC20 token address
-    * @param pool pool address
-  */
-  function addPool(address _token, address pool) external isMaster {
-    require(_token != address(0) && pool != address(0), "invalid-token-address");
-    require(poolToken[_token] == address(0), "pool-already-added");
-    poolToken[_token] = pool;
-    emit LogAddPool(_token, pool);
-  }
-
-  /**
-    * @dev Remove Pool
-    * @param _token ERC20 token address
-  */
-  function removePool(address _token) external isMaster {
-    require(_token != address(0), "invalid-token-address");
-    require(poolToken[_token] != address(0), "pool-already-removed");
-    address poolAddr = poolToken[_token];
-    delete poolToken[_token];
-    emit LogRemovePool(_token, poolAddr);
-  }
-
-  /**
     * @dev update pool rate logic
-    * @param _token token address
+    * @param _pool pool address
     * @param _newLogic new rate logic address
   */
-  function updatePoolLogic(address _token, address _newLogic) external isMaster {
-    address _pool = poolToken[_token];
+  function updatePoolLogic(address _pool, address _newLogic) external isMaster {
     require(_pool != address(0), "invalid-pool");
     require(_newLogic != address(0), "invalid-address");
     require(poolLogic[_pool] != _newLogic, "same-pool-logic");
@@ -130,11 +102,10 @@ contract Registry {
 
   /**
     * @dev update flusher logic
-    * @param _token token address
+    * @param _pool pool address
     * @param _newLogic new flusher logic address
   */
-  function updateFlusherLogic(address _token, address _newLogic) external isMaster {
-    address _pool = poolToken[_token];
+  function updateFlusherLogic(address _pool, address _newLogic) external isMaster {
     require(_pool != address(0), "invalid-pool");
     require(_newLogic != address(0), "invalid-address");
     require(flusherLogic[_pool] != _newLogic, "same-pool-logic");
@@ -144,11 +115,10 @@ contract Registry {
 
   /**
     * @dev update pool fee
-    * @param _token token address
+    * @param _pool pool address
     * @param _newFee new fee amount
   */
-  function updateFee(address _token, uint _newFee) external isMaster {
-    address _pool = poolToken[_token];
+  function updateFee(address _pool, uint _newFee) external isMaster {
     require(_pool != address(0), "invalid-pool");
     require(_newFee < 3 * 10 ** 17, "insure-fee-limit-reached");
     require(fee[_pool] != _newFee, "same-pool-fee");
@@ -158,11 +128,10 @@ contract Registry {
 
   /**
     * @dev update pool fee
-    * @param _token token address
+    * @param _pool pool address
     * @param _newCap new fee amount
   */
-  function updateCap(address _token, uint _newCap) external isMaster {
-    address _pool = poolToken[_token];
+  function updateCap(address _pool, uint _newCap) external isMaster {
     require(_pool != address(0), "invalid-pool");
     poolCap[_pool] = _newCap;
     emit LogUpdateCap(_pool, _newCap);
@@ -170,11 +139,10 @@ contract Registry {
 
   /**
     * @dev adding settlement logic
-    * @param _token token address
+    * @param _pool pool address
     * @param _logic logic proxy
   */
-  function addSettleLogic(address _token, address _logic) external isMaster {
-    address _pool = poolToken[_token];
+  function addSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
     settleLogic[_pool][_logic] = true;
     emit LogAddSettleLogic(_pool, _logic);
@@ -182,11 +150,10 @@ contract Registry {
 
   /**
     * @dev removing settlement logic
-    * @param _token token address
+    * @param _pool pool address
     * @param _logic logic proxy
   */
-  function removeSettleLogic(address _token, address _logic) external isMaster {
-    address _pool = poolToken[_token];
+  function removeSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
     delete settleLogic[_pool][_logic];
     emit LogRemoveSettleLogic(_pool, _logic);
