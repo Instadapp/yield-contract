@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.8;
 
+import { DSMath } from "../../libs/safeMath.sol";
+
 contract EthRateLogic {
     address poolToken;
 
@@ -35,5 +37,5 @@ contract EthRateLogic {
         poolToken = address(ethPool);
     }
 
-  receive() external payable {}
+    receive() external payable {}
 }
