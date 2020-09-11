@@ -10,7 +10,7 @@ contract Deployer {
   // deploy create2 + minimal proxy
   function deployLogic(address owner, address logic) public returns (address proxy) {
     require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
-    bytes32 salt = keccak256(abi.encodePacked(owner));
+    bytes32 salt = keccak256(abi.encodePacked(owner, proxy));
     bytes20 targetBytes = bytes20(logic);
     // solium-disable-next-line security/no-inline-assembly
     assembly {
@@ -41,7 +41,7 @@ contract Deployer {
   // compute create2 + minimal proxy address
   function getAddress(address owner, address logic) public view returns (address) {
     bytes32 codeHash = keccak256(getCreationCode(logic));
-    bytes32 salt = keccak256(abi.encodePacked(owner));
+    bytes32 salt = keccak256(abi.encodePacked(owner, logic));
     bytes32 rawAddress = keccak256(
       abi.encodePacked(
         bytes1(0xff),
