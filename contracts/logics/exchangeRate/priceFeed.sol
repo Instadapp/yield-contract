@@ -94,7 +94,6 @@ contract Resolver is Basic {
     public
     view
     returns (
-        uint ethPriceInUsd,
         uint[] memory tokensPriceInETH
     ) {
         tokensPriceInETH = new uint[](tokens.length);
@@ -108,17 +107,12 @@ contract Resolver is Basic {
                 tokensPriceInETH[i] = 10 ** 18;
             }
         }
-
-        FeedData memory ethFeedData = chainLinkMapping[ethAddr];
-        ChainLinkInterface ethFeed = ChainLinkInterface(ethFeedData.feedAddress);
-        ethPriceInUsd = convertPrice(uint(ethFeed.latestAnswer()), ethFeedData.multiplier);
     }
 
     function getPrice(address token)
     public
     view
     returns (
-        uint ethPriceInUsd,
         uint tokenPriceInETH
     ) { 
         if (token != ethAddr) {
@@ -129,11 +123,17 @@ contract Resolver is Basic {
         } else {
             tokenPriceInETH = 10 ** 18;
         }
+    }
 
+    function getEthPrice()
+    public
+    view
+    returns (
+        uint ethPriceInUsd
+    ) { 
         FeedData memory ethFeedData = chainLinkMapping[ethAddr];
         ChainLinkInterface ethFeed = ChainLinkInterface(ethFeedData.feedAddress);
         ethPriceInUsd = convertPrice(uint(ethFeed.latestAnswer()), ethFeedData.multiplier);
-
     }
 }
 
