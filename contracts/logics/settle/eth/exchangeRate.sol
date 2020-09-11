@@ -3,16 +3,14 @@ pragma solidity ^0.6.8;
 
 import { DSMath } from "../../../libs/safeMath.sol";
 
+interface PoolInterface {
+    function setExchangeRate() external;
+}
+
 contract LogicOne {
 
-    address poolToken;
-
-    function setExchangeRate() public {
-        // run setExchangeRate in address(this)
-    }
-
-    constructor (address ethPool) public {
-        poolToken = address(ethPool);
+    function setExchangeRate() public payable {
+        PoolInterface(address(this)).setExchangeRate();
     }
 
     receive() external payable {}
