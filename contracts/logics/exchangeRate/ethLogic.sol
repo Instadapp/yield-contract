@@ -9,6 +9,8 @@ interface CTokenInterface {
     function exchangeRateCurrent() external returns (uint256);
 
     function balanceOf(address owner) external view returns (uint256);
+
+    function underlying() external view returns (address);
 }
 
 interface CompTroller {
@@ -28,7 +30,7 @@ interface CurveMapping {
 }
 
 interface CurveRegistry {
-    function pool_list(uint) external view returns (address poolAddress, address poolToken, address ctokenPrice);
+    function pool_list(uint) external view returns (address poolAddress, address poolToken);
     function pool_count() external view returns (uint);
 }
 
@@ -40,12 +42,20 @@ interface TokenInterface {
     function balanceOf(address owner) external view returns (uint256);
 }
 
+interface PriceFeedInterface {
+    function getPrices(address[] memory tokens) external view returns (uint256[] memory pricesInETH);
+    function getPrice(address token) external view returns (uint256 priceInETH);
+    function getEthPrice() external view returns (uint256 ethPriceUSD);
+}
+
 
 contract EthRateLogic is DSMath {
     address public immutable poolToken;
     address public constant compTrollerAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
     address public constant cethAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
+    address public constant ethAddr = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
     address public constant compOracleAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
+    address public constant PriceFeedAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
     address public constant ctokenMapping = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
     address public constant curveRegistryAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
 
@@ -53,11 +63,11 @@ contract EthRateLogic is DSMath {
         uint totalSupplyInETH;
         uint totalBorrowInETH;
         address[] memory allMarkets = CompTroller(compTrollerAddr).getAllMarkets();
-        OracleComp oracleContract = OracleComp(compOracleAddr);
-        uint ethPrice = oracleContract.getUnderlyingPrice(cethAddr);
+        PriceFeedInterface priceFeedContract = PriceFeedInterface(PriceFeedAddr);
+        // uint ethPrice = oracleContract.getUnderlyingPrice(cethAddr);
         for (uint i = 0; i < allMarkets.length; i++) {
             CTokenInterface ctoken = CTokenInterface(allMarkets[i]);
-            uint tokenPriceInETH = wdiv(oracleContract.getUnderlyingPrice(address(ctoken)), ethPrice);
+            uint tokenPriceInETH = priceFeedContract.getPrice(address(ctoken) == cethAddr ? ethAddr : ctoken.underlying());
             uint supply = wmul(ctoken.balanceOf(_dsa), ctoken.exchangeRateCurrent());
             uint supplyInETH = wmul(supply, tokenPriceInETH);
 
@@ -70,18 +80,18 @@ contract EthRateLogic is DSMath {
         _netBal = sub(totalSupplyInETH, totalBorrowInETH);
     }
 
-    function getCurveNetAssetsInEth(address _dsa) private returns (uint256 _netBal) {
+    function getCurveNetAssetsInEth(address _dsa) private view returns (uint256 _netBal) {
+        // NOTICE - only stable coins pool as of now
         CurveRegistry curveRegistry = CurveRegistry(curveRegistryAddr);
         uint poolLen = curveRegistry.pool_count();
-        OracleComp oracleContract = OracleComp(compOracleAddr);
-        uint ethPrice = oracleContract.getUnderlyingPrice(cethAddr);
+        PriceFeedInterface priceFeedContract = PriceFeedInterface(PriceFeedAddr);
+        uint ethPriceUSD = priceFeedContract.getEthPrice();
         for (uint i = 0; i < poolLen; i++) {
-            (address curvePoolAddr, address curveTokenAddr, address ctokenPriceAddr) = curveRegistry.pool_list(i);
-            uint tokenPriceInETH = wdiv(oracleContract.getUnderlyingPrice(address(ctokenPriceAddr)), ethPrice);
+            (address curvePoolAddr, address curveTokenAddr) = curveRegistry.pool_list(i);
             uint virtualPrice = ICurve(curvePoolAddr).get_virtual_price();
             uint curveTokenBal = TokenInterface(curveTokenAddr).balanceOf(_dsa);
             uint amtInUSD = wmul(curveTokenBal, virtualPrice);
-            uint amtInETH = wmul(amtInUSD, tokenPriceInETH);
+            uint amtInETH = wmul(amtInUSD, ethPriceUSD);
             _netBal = add(_netBal, amtInETH);
         }
     }
