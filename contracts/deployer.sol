@@ -4,9 +4,12 @@ pragma solidity ^0.6.8;
 
 contract Deployer {
 
-  mapping (address => address) public flushers;
-
   event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
+  event LogEnableConnector(address indexed connector);
+  event LogDisableConnector(address indexed connector);
+
+  mapping (address => address) public flushers;
+  mapping (address => bool) public connectors;
 
   // deploy create2 + minimal proxy
   function deployLogic(address owner, address logic) public returns (address proxy) {
@@ -31,6 +34,33 @@ contract Deployer {
     emit LogNewFlusher(owner, proxy, logic);
   }
 
+  // enable flusher connector
+  function enableConnector(address _connector) external isChief {
+    require(!connectors[_connector], "already-enabled");
+    require(_connector != address(0), "invalid-connector");
+    connectors[_connector] = true;
+    emit LogEnableConnector(_connector);
+  }
+
+  // disable flusher connector
+  function disableConnector(address _connector) external isChief {
+    require(connectors[_connector], "already-disabled");
+    delete connectors[_connector];
+    emit LogDisableConnector(_connector);
+  }
+
+  // check if connectors[] are enabled
+  function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
+    isOk = true;
+    for (uint i = 0; i < _connectors.length; i++) {
+      if (!connectors[_connectors[i]]) {
+        isOk = false;
+        break;
+      }
+    }
+  }
+
+  // is flusher deployed?
   function isFlusherDeployed(address _address) public view returns (bool) {
     uint32 size;
     assembly {
@@ -54,10 +84,12 @@ contract Deployer {
     return address(bytes20(rawAddress << 96));
   }
 
+  // get logic contract creation code
   function getCreationCode(address logic) public pure returns (bytes memory) {
     bytes20 a = bytes20(0x3D602d80600A3D3981F3363d3d373d3D3D363d73);
     bytes20 b = bytes20(logic);
     bytes15 c = bytes15(0x5af43d82803e903d91602b57fd5bf3);
     return abi.encodePacked(a, b, c);
   }
+
 }
