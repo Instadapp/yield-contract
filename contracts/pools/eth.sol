@@ -15,7 +15,6 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function flusherLogic(address) external returns (address);
   function fee(address) external view returns (uint);
   function poolCap(address) external view returns (uint);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
@@ -23,10 +22,6 @@ interface RegistryInterface {
 
 interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
-}
-
-interface FlusherLogicInterface {
-  function isFlusher(address) external returns (bool);
 }
 
 contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
@@ -41,6 +36,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   IERC20 public immutable baseToken; // Base token.
   RegistryInterface public immutable registry; // Pool Registry
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
+  DeployerInterface public constant deployer = DeployerInterface(address(0)); // TODO - Change while deploying
 
   uint public exchangeRate = 10 ** 18; // initial 1 token = 1
   uint public feeAmt; // fee collected on profits
@@ -57,11 +53,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
 
   modifier isChief() {
     require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
-    _;
-  }
-
-  modifier isFlusher() {
-    require(FlusherLogicInterface(registry.flusherLogic(address(this))).isFlusher(msg.sender), "not-flusher");
     _;
   }
 
@@ -127,7 +118,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) public whenNotPaused payable isFlusher returns (uint mintAmt) {
+  function deposit(uint tknAmt) public whenNotPaused payable returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);

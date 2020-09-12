@@ -4,7 +4,7 @@ pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
 interface RegistryInterface {
-  function signer(address) external view returns (bool);
+  function signer(address) external view returns (bool); 
   function isConnector(address[] calldata) external view returns (bool);
 }
 

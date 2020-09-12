@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.8;
 
 contract Deployer {
 
-  mapping (address => bool) public flushers;
+  mapping (address => address) public flushers;
 
   event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
 
@@ -26,7 +27,7 @@ contract Deployer {
       )
       proxy := create2(0, clone, 0x37, salt)
     }
-    flushers[proxy] = true;
+    flushers[proxy] = owner;
     emit LogNewFlusher(owner, proxy, logic);
   }
 
