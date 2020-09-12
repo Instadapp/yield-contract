@@ -83,7 +83,7 @@ contract Controller {
 
 }
 
-contract Deployer is Controller {
+contract InstaDeployer is Controller {
 
   event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
 
