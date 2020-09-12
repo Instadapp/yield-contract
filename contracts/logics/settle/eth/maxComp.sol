@@ -12,12 +12,13 @@ contract LogicOne {
 
     function maxComp(address _dsa, address[] calldata _targets, bytes[] calldata _data) public {
         // check if DSA is authorised for interaction
-        address compoundConnector = address(0);
-        address instaPoolConnector = address(0);
+        // Also think on dydx flash loan connector
+        address compoundConnector = address(0); // Check9898 - address of compound connector
+        address instaPoolConnector = address(0); // Check9898 - address of instaPool connector
         for (uint i = 0; i < _targets.length; i++) {
             require(_targets[i] == compoundConnector || _targets[i] == instaPoolConnector, "connector-not-authorised");
         }
-        DSAInterface(_dsa).cast(_targets, _data, address(0));
+        DSAInterface(_dsa).cast(_targets, _data, address(0)); // Check9898 - address of basic connector
         // check if status is safe and only have assets in the specific tokens
     }
 
