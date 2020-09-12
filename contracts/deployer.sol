@@ -2,36 +2,38 @@
 
 pragma solidity ^0.6.8;
 
-contract Deployer {
+contract Controller {
 
-  event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
+  event LogNewMaster(address indexed master);
+  event LogUpdateMaster(address indexed master);
   event LogEnableConnector(address indexed connector);
   event LogDisableConnector(address indexed connector);
 
-  mapping (address => address) public flushers;
+  address private newMaster;
+  address public master;
   mapping (address => bool) public connectors;
 
-  // deploy create2 + minimal proxy
-  function deployLogic(address owner, address logic) public returns (address proxy) {
-    require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
-    bytes32 salt = keccak256(abi.encodePacked(owner, proxy));
-    bytes20 targetBytes = bytes20(logic);
-    // solium-disable-next-line security/no-inline-assembly
-    assembly {
-      let clone := mload(0x40)
-      mstore(
-        clone,
-        0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
-      )
-      mstore(add(clone, 0x14), targetBytes)
-      mstore(
-        add(clone, 0x28),
-        0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
-      )
-      proxy := create2(0, clone, 0x37, salt)
-    }
-    flushers[proxy] = owner;
-    emit LogNewFlusher(owner, proxy, logic);
+  modifier isMaster() {
+    require(msg.sender == master, "not-master");
+    _;
+  }
+
+  // change the master address
+  function changeMaster(address _newMaster) external isMaster {
+    require(_newMaster != master, "already-a-master");
+    require(_newMaster != address(0), "not-valid-address");
+    require(newMaster != _newMaster, "already-a-new-master");
+    newMaster = _newMaster;
+    emit LogNewMaster(_newMaster);
+  }
+
+  // new master claiming master position
+  function claimMaster() external {
+    require(newMaster != address(0), "not-valid-address");
+    require(msg.sender == newMaster, "not-new-master");
+    master = newMaster;
+    newMaster = address(0);
+    emit LogUpdateMaster(master);
   }
 
   // enable flusher connector
@@ -58,6 +60,37 @@ contract Deployer {
         break;
       }
     }
+  }
+
+}
+
+contract Deployer is Controller {
+
+  event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
+
+  mapping (address => address) public flushers;
+
+  // deploy create2 + minimal proxy
+  function deployLogic(address owner, address logic) public returns (address proxy) {
+    require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
+    bytes32 salt = keccak256(abi.encodePacked(owner, proxy));
+    bytes20 targetBytes = bytes20(logic);
+    // solium-disable-next-line security/no-inline-assembly
+    assembly {
+      let clone := mload(0x40)
+      mstore(
+        clone,
+        0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000000000000000000000
+      )
+      mstore(add(clone, 0x14), targetBytes)
+      mstore(
+        add(clone, 0x28),
+        0x5af43d82803e903d91602b57fd5bf30000000000000000000000000000000000
+      )
+      proxy := create2(0, clone, 0x37, salt)
+    }
+    flushers[proxy] = owner;
+    emit LogNewFlusher(owner, proxy, logic);
   }
 
   // is flusher deployed?
@@ -90,6 +123,11 @@ contract Deployer {
     bytes20 b = bytes20(logic);
     bytes15 c = bytes15(0x5af43d82803e903d91602b57fd5bf3);
     return abi.encodePacked(a, b, c);
+  }
+
+  constructor(address _master) public {
+    master = _master;
+    emit LogUpdateMaster(master);
   }
 
 }

@@ -159,5 +159,5 @@ contract Registry {
   constructor(address _chief) public {
     chief[_chief] = true;
     emit LogAddChief(_chief);
-  } 
+  }
 }
