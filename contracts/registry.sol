@@ -11,11 +11,11 @@ contract Registry {
 
   event LogAddChief(address indexed chief);
   event LogRemoveChief(address indexed chief);
-  event LogUpdatePoolLogic(address token, address newLogic);
-  event LogUpdateFee(address token, uint newFee);
-  event LogUpdateCap(address token, uint newFee);
-  event LogAddSettleLogic(address indexed token, address indexed logic);
-  event LogRemoveSettleLogic(address indexed token, address indexed logic);
+  event LogUpdatePoolLogic(address pool, address newLogic);
+  event LogUpdateFee(address pool, uint newFee);
+  event LogUpdateCap(address pool, uint newCap);
+  event LogAddSettleLogic(address indexed pool, address indexed logic);
+  event LogRemoveSettleLogic(address indexed pool, address indexed logic);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
