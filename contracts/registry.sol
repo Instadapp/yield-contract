@@ -84,9 +84,9 @@ contract Registry {
   }
 
   /**
-    * @dev update pool fee
+    * @dev update pool cap
     * @param _pool pool address
-    * @param _newCap new fee amount
+    * @param _newCap new cap amount
   */
   function updateCap(address _pool, uint _newCap) external isMaster {
     require(_pool != address(0), "invalid-pool");
@@ -101,6 +101,7 @@ contract Registry {
   */
   function addSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
+    require(!settleLogic[_pool][_logic], "already-settle-added");
     settleLogic[_pool][_logic] = true;
     emit LogAddSettleLogic(_pool, _logic);
   }
@@ -112,6 +113,7 @@ contract Registry {
   */
   function removeSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
+    require(settleLogic[_pool][_logic], "already-settle-removed");
     delete settleLogic[_pool][_logic];
     emit LogRemoveSettleLogic(_pool, _logic);
   }
