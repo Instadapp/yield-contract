@@ -8,10 +8,13 @@ contract Controller {
   event LogUpdateMaster(address indexed master);
   event LogEnableConnector(address indexed connector);
   event LogDisableConnector(address indexed connector);
+  event LogAddSigner(address indexed signer);
+  event LogRemoveSigner(address indexed signer);
 
   address private newMaster;
   address public master;
   mapping (address => bool) public connectors;
+  mapping (address => bool) public signer;
 
   modifier isMaster() {
     require(msg.sender == master, "not-master");
@@ -36,19 +39,35 @@ contract Controller {
     emit LogUpdateMaster(master);
   }
 
-  // enable flusher connector
-  function enableConnector(address _connector) external isChief {
+  // enable connector
+  function enableConnector(address _connector) external isMaster {
     require(!connectors[_connector], "already-enabled");
     require(_connector != address(0), "invalid-connector");
     connectors[_connector] = true;
     emit LogEnableConnector(_connector);
   }
 
-  // disable flusher connector
-  function disableConnector(address _connector) external isChief {
+  // disable connector
+  function disableConnector(address _connector) external isMaster {
     require(connectors[_connector], "already-disabled");
     delete connectors[_connector];
     emit LogDisableConnector(_connector);
+  }
+
+  // enable signer
+  function enableSigner(address _signer) external isMaster {
+    require(_signer != address(0), "invalid-address");
+    require(!signer[_signer], "signer-already-enabled");
+    signer[_signer] = true;
+    emit LogAddSigner(_signer);
+  }
+
+  // disable signer
+  function disableSigner(address _signer) external isMaster {
+    require(_signer != address(0), "invalid-address");
+    require(signer[_signer], "signer-already-disabled");
+    delete signer[_signer];
+    emit LogRemoveSigner(_signer);
   }
 
   // check if connectors[] are enabled

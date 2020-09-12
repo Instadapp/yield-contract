@@ -11,8 +11,6 @@ contract Registry {
 
   event LogAddChief(address indexed chief);
   event LogRemoveChief(address indexed chief);
-  event LogAddSigner(address indexed signer);
-  event LogRemoveSigner(address indexed signer);
   event LogUpdatePoolLogic(address token, address newLogic);
   event LogUpdateFee(address token, uint newFee);
   event LogUpdateCap(address token, uint newFee);
@@ -22,7 +20,6 @@ contract Registry {
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   mapping (address => bool) public chief;
-  mapping (address => bool) public signer;
   mapping (address => address) public poolLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public fee;
@@ -58,28 +55,6 @@ contract Registry {
     require(chief[_chief], "chief-already-disabled");
     delete chief[_chief];
     emit LogRemoveChief(_chief);
-  }
-
-  /**
-    * @dev Enable New Signer.
-    * @param _signer Address of the new signer.
-  */
-  function enableSigner(address _signer) external isChief {
-    require(_signer != address(0), "invalid-address");
-    require(!signer[_signer], "signer-already-enabled");
-    signer[_signer] = true;
-    emit LogAddSigner(_signer);
-  }
-
-  /**
-    * @dev Disable Signer.
-    * @param _signer Address of the existing signer.
-  */
-  function disableSigner(address _signer) external isChief {
-    require(_signer != address(0), "invalid-address");
-    require(signer[_signer], "signer-already-disabled");
-    delete signer[_signer];
-    emit LogRemoveSigner(_signer);
   }
 
   /**
