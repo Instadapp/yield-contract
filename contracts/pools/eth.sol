@@ -2,7 +2,6 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -25,7 +24,6 @@ interface RateInterface {
 }
 
 contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
-  using SafeERC20 for IERC20;
 
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
@@ -36,7 +34,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   IERC20 public immutable baseToken; // Base token.
   RegistryInterface public immutable registry; // Pool Registry
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
-  DeployerInterface public constant deployer = DeployerInterface(address(0)); // TODO - Change while deploying
 
   uint public exchangeRate = 10 ** 18; // initial 1 token = 1
   uint public feeAmt; // fee collected on profits
