@@ -3,8 +3,8 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-interface RegistryInterface {
-  function signer(address) external view returns (bool);
+interface DeployerInterface {
+  function signer(address) external view returns (bool); 
   function isConnector(address[] calldata) external view returns (bool);
 }
 
@@ -13,7 +13,7 @@ contract Flusher {
 
   string constant public name = "Flusher-v1";
 
-  RegistryInterface public constant registry = RegistryInterface(address(0)); // TODO - Change while deploying
+  DeployerInterface public constant deployer = DeployerInterface(address(0)); // TODO - Change while deploying
 
   function spell(address _target, bytes memory _data) internal {
     require(_target != address(0), "target-invalid");
@@ -29,9 +29,9 @@ contract Flusher {
   }
 
   function cast(address[] calldata _targets, bytes[] calldata _datas) external payable {
-    require(registry.signer(msg.sender), "not-signer");
+    require(deployer.signer(msg.sender), "not-signer");
     require(_targets.length == _datas.length , "invalid-array-length");
-    require(registry.isConnector(_targets), "not-connector");
+    require(deployer.isConnector(_targets), "not-connector");
     for (uint i = 0; i < _targets.length; i++) {
         spell(_targets[i], _datas[i]);
     }

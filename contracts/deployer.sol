@@ -1,16 +1,98 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity ^0.6.8;
 
-contract Deployer {
+contract Controller {
 
-  mapping (address => bool) public flushers;
+  event LogNewMaster(address indexed master);
+  event LogUpdateMaster(address indexed master);
+  event LogEnableConnector(address indexed connector);
+  event LogDisableConnector(address indexed connector);
+  event LogAddSigner(address indexed signer);
+  event LogRemoveSigner(address indexed signer);
+
+  address private newMaster;
+  address public master;
+  mapping (address => bool) public connectors;
+  mapping (address => bool) public signer;
+
+  modifier isMaster() {
+    require(msg.sender == master, "not-master");
+    _;
+  }
+
+  // change the master address
+  function changeMaster(address _newMaster) external isMaster {
+    require(_newMaster != master, "already-a-master");
+    require(_newMaster != address(0), "not-valid-address");
+    require(newMaster != _newMaster, "already-a-new-master");
+    newMaster = _newMaster;
+    emit LogNewMaster(_newMaster);
+  }
+
+  // new master claiming master position
+  function claimMaster() external {
+    require(newMaster != address(0), "not-valid-address");
+    require(msg.sender == newMaster, "not-new-master");
+    master = newMaster;
+    newMaster = address(0);
+    emit LogUpdateMaster(master);
+  }
+
+  // enable connector
+  function enableConnector(address _connector) external isMaster {
+    require(!connectors[_connector], "already-enabled");
+    require(_connector != address(0), "invalid-connector");
+    connectors[_connector] = true;
+    emit LogEnableConnector(_connector);
+  }
+
+  // disable connector
+  function disableConnector(address _connector) external isMaster {
+    require(connectors[_connector], "already-disabled");
+    delete connectors[_connector];
+    emit LogDisableConnector(_connector);
+  }
+
+  // enable signer
+  function enableSigner(address _signer) external isMaster {
+    require(_signer != address(0), "invalid-address");
+    require(!signer[_signer], "signer-already-enabled");
+    signer[_signer] = true;
+    emit LogAddSigner(_signer);
+  }
+
+  // disable signer
+  function disableSigner(address _signer) external isMaster {
+    require(_signer != address(0), "invalid-address");
+    require(signer[_signer], "signer-already-disabled");
+    delete signer[_signer];
+    emit LogRemoveSigner(_signer);
+  }
+
+  // check if connectors[] are enabled
+  function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
+    isOk = true;
+    for (uint i = 0; i < _connectors.length; i++) {
+      if (!connectors[_connectors[i]]) {
+        isOk = false;
+        break;
+      }
+    }
+  }
+
+}
+
+contract InstaDeployer is Controller {
 
   event LogNewFlusher(address indexed owner, address indexed flusher, address indexed logic);
+
+  mapping (address => address) public flushers;
 
   // deploy create2 + minimal proxy
   function deployLogic(address owner, address logic) public returns (address proxy) {
     require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
-    bytes32 salt = keccak256(abi.encodePacked(owner, proxy));
+    bytes32 salt = keccak256(abi.encodePacked(owner, logic));
     bytes20 targetBytes = bytes20(logic);
     // solium-disable-next-line security/no-inline-assembly
     assembly {
@@ -26,10 +108,11 @@ contract Deployer {
       )
       proxy := create2(0, clone, 0x37, salt)
     }
-    flushers[proxy] = true;
+    flushers[proxy] = owner;
     emit LogNewFlusher(owner, proxy, logic);
   }
 
+  // is flusher deployed?
   function isFlusherDeployed(address _address) public view returns (bool) {
     uint32 size;
     assembly {
@@ -53,10 +136,17 @@ contract Deployer {
     return address(bytes20(rawAddress << 96));
   }
 
+  // get logic contract creation code
   function getCreationCode(address logic) public pure returns (bytes memory) {
     bytes20 a = bytes20(0x3D602d80600A3D3981F3363d3d373d3D3D363d73);
     bytes20 b = bytes20(logic);
     bytes15 c = bytes15(0x5af43d82803e903d91602b57fd5bf3);
     return abi.encodePacked(a, b, c);
   }
+
+  constructor(address _master) public {
+    master = _master;
+    emit LogUpdateMaster(master);
+  }
+
 }

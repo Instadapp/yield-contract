@@ -11,27 +11,19 @@ contract Registry {
 
   event LogAddChief(address indexed chief);
   event LogRemoveChief(address indexed chief);
-  event LogAddSigner(address indexed signer);
-  event LogRemoveSigner(address indexed signer);
-  event LogUpdatePoolLogic(address token, address newLogic);
-  event LogUpdateFlusherLogic(address token, address newLogic);
-  event LogUpdateFee(address token, uint newFee);
-  event LogUpdateCap(address token, uint newFee);
-  event LogAddSettleLogic(address indexed token, address indexed logic);
-  event LogRemoveSettleLogic(address indexed token, address indexed logic);
-  event LogFlusherConnectorsEnable(address indexed connector);
-  event LogFlusherConnectorsDisable(address indexed connector);
+  event LogUpdatePoolLogic(address pool, address newLogic);
+  event LogUpdateFee(address pool, uint newFee);
+  event LogUpdateCap(address pool, uint newCap);
+  event LogAddSettleLogic(address indexed pool, address indexed logic);
+  event LogRemoveSettleLogic(address indexed pool, address indexed logic);
 
   IndexInterface public constant instaIndex = IndexInterface(0x2971AdFa57b20E5a416aE5a708A8655A9c74f723);
 
   mapping (address => bool) public chief;
-  mapping (address => bool) public signer;
   mapping (address => address) public poolLogic;
-  mapping (address => address) public flusherLogic;
   mapping (address => uint) public poolCap;
   mapping (address => uint) public fee;
   mapping (address => mapping(address => bool)) public settleLogic;
-  mapping (address => bool) public flusherConnectors;
 
   modifier isMaster() {
     require(msg.sender == instaIndex.master(), "not-master");
@@ -66,28 +58,6 @@ contract Registry {
   }
 
   /**
-    * @dev Enable New Signer.
-    * @param _signer Address of the new signer.
-  */
-  function enableSigner(address _signer) external isChief {
-    require(_signer != address(0), "invalid-address");
-    require(!signer[_signer], "signer-already-enabled");
-    signer[_signer] = true;
-    emit LogAddSigner(_signer);
-  }
-
-  /**
-    * @dev Disable Signer.
-    * @param _signer Address of the existing signer.
-  */
-  function disableSigner(address _signer) external isChief {
-    require(_signer != address(0), "invalid-address");
-    require(signer[_signer], "signer-already-disabled");
-    delete signer[_signer];
-    emit LogRemoveSigner(_signer);
-  }
-
-  /**
     * @dev update pool rate logic
     * @param _pool pool address
     * @param _newLogic new rate logic address
@@ -98,19 +68,6 @@ contract Registry {
     require(poolLogic[_pool] != _newLogic, "same-pool-logic");
     poolLogic[_pool] = _newLogic;
     emit LogUpdatePoolLogic(_pool, _newLogic);
-  }
-
-  /**
-    * @dev update flusher logic
-    * @param _pool pool address
-    * @param _newLogic new flusher logic address
-  */
-  function updateFlusherLogic(address _pool, address _newLogic) external isMaster {
-    require(_pool != address(0), "invalid-pool");
-    require(_newLogic != address(0), "invalid-address");
-    require(flusherLogic[_pool] != _newLogic, "same-pool-logic");
-    flusherLogic[_pool] = _newLogic;
-    emit LogUpdateFlusherLogic(_pool, _newLogic);
   }
 
   /**
@@ -127,9 +84,9 @@ contract Registry {
   }
 
   /**
-    * @dev update pool fee
+    * @dev update pool cap
     * @param _pool pool address
-    * @param _newCap new fee amount
+    * @param _newCap new cap amount
   */
   function updateCap(address _pool, uint _newCap) external isMaster {
     require(_pool != address(0), "invalid-pool");
@@ -144,6 +101,7 @@ contract Registry {
   */
   function addSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
+    require(!settleLogic[_pool][_logic], "already-settle-added");
     settleLogic[_pool][_logic] = true;
     emit LogAddSettleLogic(_pool, _logic);
   }
@@ -155,29 +113,9 @@ contract Registry {
   */
   function removeSettleLogic(address _pool, address _logic) external isMaster {
     require(_pool != address(0), "invalid-pool");
+    require(settleLogic[_pool][_logic], "already-settle-removed");
     delete settleLogic[_pool][_logic];
     emit LogRemoveSettleLogic(_pool, _logic);
-  }
-
-  /**
-    * @dev enable pool connector
-    * @param _connector logic proxy
-  */
-  function enableConnector(address _connector) external isChief {
-    require(!flusherConnectors[_connector], "already-enabled");
-    require(_connector != address(0), "invalid-connector");
-    flusherConnectors[_connector] = true;
-    emit LogFlusherConnectorsEnable(_connector);
-  }
-
-  /**
-    * @dev disable pool connector
-    * @param _connector logic proxy
-  */
-  function disableConnector(address _connector) external isChief {
-    require(flusherConnectors[_connector], "already-disabled");
-    delete flusherConnectors[_connector];
-    emit LogFlusherConnectorsDisable(_connector);
   }
 
   /**
@@ -195,22 +133,8 @@ contract Registry {
     }
   }
 
-  /**
-    * @dev check if connectors are enabled
-    * @param _connectors array of logic proxy
-  */
-  function isConnector(address[] calldata _connectors) external view returns (bool isOk) {
-    isOk = true;
-    for (uint i = 0; i < _connectors.length; i++) {
-      if (!flusherConnectors[_connectors[i]]) {
-        isOk = false;
-        break;
-      }
-    }
-  }
-
   constructor(address _chief) public {
     chief[_chief] = true;
     emit LogAddChief(_chief);
-  } 
+  }
 }

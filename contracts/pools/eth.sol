@@ -2,7 +2,6 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -15,7 +14,6 @@ interface IndexInterface {
 interface RegistryInterface {
   function chief(address) external view returns (bool);
   function poolLogic(address) external returns (address);
-  function flusherLogic(address) external returns (address);
   function fee(address) external view returns (uint);
   function poolCap(address) external view returns (uint);
   function checkSettleLogics(address, address[] calldata) external view returns (bool);
@@ -25,12 +23,7 @@ interface RateInterface {
   function getTotalToken() external returns (uint totalUnderlyingTkn);
 }
 
-interface FlusherLogicInterface {
-  function isFlusher(address) external returns (bool);
-}
-
 contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
-  using SafeERC20 for IERC20;
 
   event LogExchangeRate(uint exchangeRate, uint tokenBalance, uint insuranceAmt);
   event LogSettle(uint settleBlock);
@@ -57,11 +50,6 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
 
   modifier isChief() {
     require(registry.chief(msg.sender) || msg.sender == instaIndex.master(), "not-chief");
-    _;
-  }
-
-  modifier isFlusher() {
-    require(FlusherLogicInterface(registry.flusherLogic(address(this))).isFlusher(msg.sender), "not-flusher");
     _;
   }
 
@@ -127,7 +115,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) public whenNotPaused payable isFlusher returns (uint mintAmt) {
+  function deposit(uint tknAmt) external whenNotPaused payable returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
