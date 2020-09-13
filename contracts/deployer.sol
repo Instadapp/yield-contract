@@ -90,7 +90,7 @@ contract InstaDeployer is Controller {
   mapping (address => address) public flushers;
 
   // deploy create2 + minimal proxy
-  function deployLogic(address owner, address logic) public returns (address proxy) {
+  function deployFlusher(address owner, address logic) public returns (address proxy) {
     require(!(isFlusherDeployed(getAddress(owner, logic))), "flusher-already-deployed");
     bytes32 salt = keccak256(abi.encodePacked(owner, logic));
     bytes20 targetBytes = bytes20(logic);
