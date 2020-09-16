@@ -91,7 +91,7 @@ contract EthRateLogic is DSMath {
             uint virtualPrice = ICurve(curvePoolAddr).get_virtual_price();
             uint curveTokenBal = TokenInterface(curveTokenAddr).balanceOf(_dsa);
             uint amtInUSD = wmul(curveTokenBal, virtualPrice);
-            uint amtInETH = wmul(amtInUSD, ethPriceUSD);
+            uint amtInETH = wdiv(amtInUSD, ethPriceUSD);
             _netBal = add(_netBal, amtInETH);
         }
     }
