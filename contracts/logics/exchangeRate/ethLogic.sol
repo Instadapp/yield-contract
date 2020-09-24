@@ -3,7 +3,6 @@ pragma solidity ^0.6.8;
 
 import { DSMath } from "../../libs/safeMath.sol";
 
-// TODO - have to check y pool virtual price
 interface CTokenInterface {
     function borrowBalanceCurrent(address account) external returns (uint256);
     function exchangeRateCurrent() external returns (uint256);
