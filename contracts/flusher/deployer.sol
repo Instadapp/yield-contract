@@ -7,6 +7,8 @@ contract Controller {
   event LogNewMaster(address indexed master);
   event LogUpdateMaster(address indexed master);
   event LogEnableConnector(address indexed connector);
+  event LogDisableImplementation(address indexed logic);
+  event LogEnableImplementation(address indexed logic);
   event LogDisableConnector(address indexed connector);
   event LogAddSigner(address indexed signer);
   event LogRemoveSigner(address indexed signer);
@@ -14,6 +16,7 @@ contract Controller {
   address private newMaster;
   address public master;
   mapping (address => bool) public connectors;
+  mapping (address => bool) public implementationLogic;
   mapping (address => bool) public signer;
 
   modifier isMaster() {
@@ -52,6 +55,21 @@ contract Controller {
     require(connectors[_connector], "already-disabled");
     delete connectors[_connector];
     emit LogDisableConnector(_connector);
+  }
+
+  // enable Implementation Logic
+  function enableImplementationLogic(address _implementationLogic) external isMaster {
+    require(!implementationLogic[_implementationLogic], "already-enabled");
+    require(_implementationLogic != address(0), "invalid-logic");
+    implementationLogic[_implementationLogic] = true;
+    emit LogEnableImplementation(_implementationLogic);
+  }
+
+  // disable Implementation Logic
+  function disableImplementationLogic(address _implementationLogic) external isMaster {
+    require(implementationLogic[_implementationLogic], "already-disabled");
+    delete implementationLogic[_implementationLogic];
+    emit LogDisableImplementation(_implementationLogic);
   }
 
   // enable signer
