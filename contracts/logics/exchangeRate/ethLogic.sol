@@ -57,7 +57,8 @@ contract EthRateLogic is DSMath {
     address public constant compOracleAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
     address public constant PriceFeedAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
     address public constant ctokenMapping = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
-    address public constant curveRegistryAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
+    address public constant curve3poolAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
+    address public constant curve3poolTokenAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
 
     function getCompoundNetAssetsInEth(address _dsa) private returns (uint256 _netBal) {
         uint totalSupplyInETH;
@@ -81,19 +82,13 @@ contract EthRateLogic is DSMath {
     }
 
     function getCurveNetAssetsInEth(address _dsa) private view returns (uint256 _netBal) {
-        // NOTICE - only stable coins pool as of now
-        CurveRegistry curveRegistry = CurveRegistry(curveRegistryAddr);
-        uint poolLen = curveRegistry.pool_count();
         PriceFeedInterface priceFeedContract = PriceFeedInterface(PriceFeedAddr);
         uint ethPriceUSD = priceFeedContract.getEthPrice();
-        for (uint i = 0; i < poolLen; i++) {
-            (address curvePoolAddr, address curveTokenAddr) = curveRegistry.pool_list(i);
-            uint virtualPrice = ICurve(curvePoolAddr).get_virtual_price();
-            uint curveTokenBal = TokenInterface(curveTokenAddr).balanceOf(_dsa);
-            uint amtInUSD = wmul(curveTokenBal, virtualPrice);
-            uint amtInETH = wdiv(amtInUSD, ethPriceUSD);
-            _netBal = add(_netBal, amtInETH);
-        }
+        uint virtualPrice = ICurve(curve3poolAddr).get_virtual_price();
+        uint curveTokenBal = TokenInterface(curve3poolTokenAddr).balanceOf(_dsa);
+        uint amtInUSD = wmul(curveTokenBal, virtualPrice);
+        uint amtInETH = wdiv(amtInUSD, ethPriceUSD);
+        _netBal = add(_netBal, amtInETH);
     }
 
     function getNetDsaAssets(address _dsa) private returns (uint256 _netBal) {
