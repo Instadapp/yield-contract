@@ -24,7 +24,7 @@ contract Flusher is Proxy {
 
     function setBasic(address newImplementation) public {
         require(_implementation() == address(0), "_implementation-logic-already-set");
-        require(newImplementation == address(0), "newImplementation-not-vaild");
+        require(newImplementation != address(0), "newImplementation-not-vaild");
         bytes32 slot = _IMPLEMENTATION_SLOT;
 
         // solhint-disable-next-line no-inline-assembly
