@@ -16,7 +16,7 @@ contract Controller {
   address private newMaster;
   address public master;
   mapping (address => bool) public connectors;
-  mapping (address => bool) public implementationLogic;
+  mapping (address => bool) public implementations;
   mapping (address => bool) public signer;
 
   modifier isMaster() {
@@ -57,34 +57,34 @@ contract Controller {
     emit LogDisableConnector(_connector);
   }
 
-  // enable Implementation Logic
-  function enableImplementationLogic(address _implementationLogic) external isMaster {
-    require(!implementationLogic[_implementationLogic], "already-enabled");
-    require(_implementationLogic != address(0), "invalid-logic");
-    implementationLogic[_implementationLogic] = true;
-    emit LogEnableImplementation(_implementationLogic);
+  // enable implementation
+  function enableImplementation(address _logic) external isMaster {
+    require(!implementations[_logic], "already-enabled");
+    require(_logic != address(0), "invalid-logic");
+    implementations[_logic] = true;
+    emit LogEnableImplementation(_logic);
   }
 
-  // disable Implementation Logic
-  function disableImplementationLogic(address _implementationLogic) external isMaster {
-    require(implementationLogic[_implementationLogic], "already-disabled");
-    delete implementationLogic[_implementationLogic];
-    emit LogDisableImplementation(_implementationLogic);
+  // disable implementation
+  function disableImplementation(address _logic) external isMaster {
+    require(implementations[_logic], "already-disabled");
+    delete implementations[_logic];
+    emit LogDisableImplementation(_logic);
   }
 
   // enable signer
   function enableSigner(address _signer) external isMaster {
     require(_signer != address(0), "invalid-address");
-    require(!signer[_signer], "signer-already-enabled");
-    signer[_signer] = true;
+    require(!signers[_signer], "signer-already-enabled");
+    signers[_signer] = true;
     emit LogAddSigner(_signer);
   }
 
   // disable signer
   function disableSigner(address _signer) external isMaster {
     require(_signer != address(0), "invalid-address");
-    require(signer[_signer], "signer-already-disabled");
-    delete signer[_signer];
+    require(signers[_signer], "signer-already-disabled");
+    delete signers[_signer];
     emit LogRemoveSigner(_signer);
   }
 
