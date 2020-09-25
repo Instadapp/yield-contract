@@ -2,7 +2,7 @@
 pragma solidity ^0.6.8;
 pragma experimental ABIEncoderV2;
 
-import { DSMath } from "../../libs/safeMath.sol";
+import { DSMath } from "../../../libs/safeMath.sol";
 
 interface CTokenInterface {
     function borrowBalanceCurrent(address account) external returns (uint256);
@@ -29,53 +29,105 @@ interface InstaMapping {
     function cTokenMapping(address) external view returns (address);
 }
 
-contract LogicOne {
+contract LogicOne is DSMath {
 
-    address public constant compTrollerAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
-    address public constant cethAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
-    address public constant cdaiAddr = address(0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643);
-    address public constant ethAddr = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    address public constant compOracleAddr = address(0xe81F70Cc7C0D46e12d70efc60607F16bbD617E88);
-
-    function getCompoundNetAssetsInEth(address _dsa) private returns (uint256 _netBal) {
-        uint totalSupplyInETH;
-        uint totalBorrowInETH;
-        address[] memory allMarkets = CompTroller(compTrollerAddr).getAllMarkets();
-        OracleComp priceFeedContract = OracleComp(compOracleAddr);
-        // uint ethPrice = oracleContract.getUnderlyingPrice(cethAddr);
-        for (uint i = 0; i < allMarkets.length; i++) {
-            CTokenInterface ctoken = CTokenInterface(allMarkets[i]);
-            uint tokenPriceInETH = priceFeedContract.getPrice(address(ctoken) == cethAddr ? ethAddr : ctoken.underlying());
-            uint supply = wmul(ctoken.balanceOf(_dsa), ctoken.exchangeRateCurrent());
-            uint supplyInETH = wmul(supply, tokenPriceInETH);
-
-            uint borrow = ctoken.borrowBalanceCurrent(_dsa);
-            uint borrowInETH = wmul(borrow, tokenPriceInETH);
-
-            totalSupplyInETH += add(totalSupplyInETH, supplyInETH);
-            totalBorrowInETH = add(totalBorrowInETH, borrowInETH);
-
-            if (allMarkets[i] != cdaiAddr && allMarkets[i] != cethAddr) {
-                require(supply == 0 && borrow == 0, "assets");
-            }
-            // require()
-        }
-        _netBal = sub(totalSupplyInETH, totalBorrowInETH);
+    struct CastData {
+        address[] dsaTargets;
+        bytes[] dsaData;
     }
 
-    function maxComp(address _dsa, address[] calldata _targets, bytes[] calldata _data) public {
-        // check if DSA is authorised for interaction
-        // Also think on dydx flash loan connector
-        // initial Compound position borrow and supply
-        address compoundConnector = address(0); // Check9898 - address of compound connector
-        address instaPoolConnector = address(0); // Check9898 - address of instaPool connector
-        for (uint i = 0; i < _targets.length; i++) {
-            require(_targets[i] == compoundConnector || _targets[i] == instaPoolConnector, "connector-not-authorised");
+    function getOriginAddress() private pure returns(address) {
+        return 0xB7fA44c2E964B6EB24893f7082Ecc08c8d0c0F87; // DSA address
+    }
+
+    function getEthAddress() private pure returns(address) {
+        return 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // DSA address
+    }
+
+    function getCompAddress() private pure returns(address) {
+        return 0xc00e94Cb662C3520282E6f5717214004A7f26888; // DSA address
+    }
+
+    function getComptrollerAddress() private pure returns (address) {
+        return 0x3d9819210A31b4961b30EF54bE2aeD79B9c9Cd3B;
+    }
+
+    function getDaiAddress() private pure returns(address) {
+        return 0x6B175474E89094C44Da98b954EedeAC495271d0F; // DAI address
+    }
+
+    function getCdaiAddress() private pure returns(address) {
+        return 0x5d3a536E4D6DbD6114cc1Ead35777bAB948E3643; // CDAI address
+    }
+
+    function getDsaAddress() private pure returns(address) {
+        return address(0); // DSA address
+    }
+
+    function getCompoundConnectAddress() private pure returns(address) {
+        return 0x07F81230d73a78f63F0c2A3403AD281b067d28F8;
+    }
+
+    function getFlashloanConnectAddress() private pure returns(address) {
+        return 0xaA3EA0b22802d68DA73D5f4D3f9F1C7C238fE03A;
+    }
+
+    function getCompConnectAddress() private pure returns(address) {
+        return 0xB4a04F1C194bEed64FCE27843B5b3079339cdaD4;
+    }
+
+    function getUniswapConnectAddress() private pure returns(address) {
+        return 0x62EbfF47B2Ba3e47796efaE7C51676762dC961c0;
+    }
+    
+    function checkCompoundAssets() private {
+        address[] memory allMarkets = CompTroller(getComptrollerAddress()).getAllMarkets();
+        uint supply;
+        uint borrow;
+        for (uint i = 0; i < allMarkets.length; i++) {
+            CTokenInterface ctoken = CTokenInterface(allMarkets[i]);
+            if (allMarkets[i] == getCdaiAddress()) {
+                supply = wmul(ctoken.balanceOf(getDsaAddress()), ctoken.exchangeRateCurrent());
+            }
+            borrow = ctoken.borrowBalanceCurrent(getDsaAddress());
+
+            if (allMarkets[i] != getCdaiAddress()) {
+                require(borrow == 0, "assets");
+            } else {
+                require(wdiv(borrow, supply) < 745 * 10 ** 15, "position-risky"); // DAI ratio - should be less than 74.5%
+            }
         }
-        DSAInterface(_dsa).cast(_targets, _data, address(0)); // Check9898 - address of basic connector
-        // final Compound position borrow and supply
-        // check the chnages should only be in eth supply & dai
-        // check if status is safe and only have assets in the specific tokens
+    }
+
+    function maxComp(uint flashAmt, uint route, address[] calldata _targets, bytes[] calldata _data) external {
+        address compoundConnect = getCompoundConnectAddress();
+        address flashloanConnect = getFlashloanConnectAddress();
+        for (uint i = 0; i < _targets.length; i++) {
+            require(_targets[i] == compoundConnect || _targets[i] == flashloanConnect, "not-authorised-connector");
+        }
+        bytes memory _dataEncode = abi.encode(_targets, _data);
+        address[] memory _targetFlash = new address[](1);
+        bytes[] memory _dataFlash = new bytes[](1);
+        _targetFlash[0] = flashloanConnect;
+        _dataFlash[0] = abi.encodeWithSignature("flashBorrowAndCast(address,uint256,uint256,bytes)", getDaiAddress(), flashAmt, route, _dataEncode);
+        DSAInterface(getDsaAddress()).cast(_targetFlash, _dataFlash, getOriginAddress());
+        checkCompoundAssets();
+    }
+
+    function claimComp(address[] calldata tokens) external {
+        address[] memory _target = new address[](1);
+        bytes[] memory _data = new bytes[](1);
+        _target[0] = getCompConnectAddress(); // Comp connector
+        _data[0] = abi.encodeWithSignature("ClaimCompTwo(address[],uint256)", tokens, 0);
+        DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
+    }
+
+    function swapComp(uint amt, uint unitAmt) external {
+        address[] memory _target = new address[](1);
+        bytes[] memory _data = new bytes[](1);
+        _target[0] = getUniswapConnectAddress(); // Uniswap Connector
+        _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", getEthAddress(), getCompAddress(), amt, unitAmt, 0, 0);
+        DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
 
     receive() external payable {}
