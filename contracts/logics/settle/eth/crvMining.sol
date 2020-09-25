@@ -19,7 +19,7 @@ contract LogicOne {
     }
 
     function getOriginAddress() private pure returns(address) {
-        return 0xB7fA44c2E964B6EB24893f7082Ecc08c8d0c0F87; // Origin address
+        return 0xB7fA44c2E964B6EB24893f7082Ecc08c8d0c0F87;
     }
 
     function getDsaAddress() private pure returns(address) {
@@ -27,11 +27,11 @@ contract LogicOne {
     }
 
     function getGuageAddress() private pure returns(address) {
-        return 0xAf615b36Db171fD5A369A0060b9bCB88fFf0190d; // DSA address
+        return 0xAf615b36Db171fD5A369A0060b9bCB88fFf0190d;
     }
 
     function getGuageName() private pure returns(string memory) {
-        return "guage-3"; // Curve Guage name
+        return "guage-3";
     }
 
     function getCurveConnectAddress() private pure returns(address) {
@@ -49,9 +49,9 @@ contract LogicOne {
     function mineCrv(address token, uint amt, uint unitAmt) external {
         address[] memory _targets = new address[](2);
         bytes[] memory _data = new bytes[](2);
-        _targets[1] = address(0); // Check9898 - address of curve 3pool connector
+        _targets[1] = getCurveConnectAddress();
         _data[1] = abi.encodeWithSignature("deposit(address,uint256,uint256,uint256,uint256)", token, amt, unitAmt, uint(0), uint(0));
-        _targets[2] = address(0); // Check9898 - address of curve 3pool guage connector
+        _targets[2] = getCurveGuageConnectAddress();
         _data[2] = abi.encodeWithSignature("deposit(string,uint256,uint256,uint256)", getGuageName(), uint(-1), uint(0), uint(0));
         DSAInterface(getDsaAddress()).cast(_targets, _data, getOriginAddress());
     }
@@ -66,12 +66,12 @@ contract LogicOne {
             _targets = new address[](3);
             _data = new bytes[](3);
         }
-        _targets[0] = address(0); // Check9898 - address of curve 3pool guage connector
+        _targets[0] = getCurveGuageConnectAddress();
         _data[0] = abi.encodeWithSignature("withdraw(string,uint256,uint256,uint256,uint256,uint256)", getGuageName(), uint(-1), uint(0), uint(0), uint(0), uint(0));
-        _targets[1] = address(0); // Check9898 - address of curve 3pool connector
+        _targets[1] = getCurveConnectAddress();
         _data[1] = abi.encodeWithSignature("withdraw(address,uint256,uint256,uint256,uint256)", token, amt, unitAmt, uint(0), uint(0));
         if (amt != uint(-1)) {
-            _targets[2] = address(0); // Check9898 - address of curve 3pool guage connector
+            _targets[2] = getCurveGuageConnectAddress();
             _data[2] = abi.encodeWithSignature("deposit(string,uint256,uint256,uint256)", getGuageName(), uint(-1), uint(0), uint(0));
         }
         DSAInterface(getDsaAddress()).cast(_targets, _data, getOriginAddress());
@@ -80,7 +80,7 @@ contract LogicOne {
     function claimCrv() external {
         address[] memory _target = new address[](1);
         bytes[] memory _data = new bytes[](1);
-        _target[0] = 0xAf615b36Db171fD5A369A0060b9bCB88fFf0190d; // Curve guage connector
+        _target[0] = getCurveGuageConnectAddress();
         _data[0] = abi.encodeWithSignature("claimReward(string,uint256,uint256)", getGuageName(), 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
@@ -90,7 +90,7 @@ contract LogicOne {
         address eth = getEthAddress();
         address[] memory _target = new address[](1);
         bytes[] memory _data = new bytes[](1);
-        _target[0] = getUniswapConnectAddress(); // Uniswap Connector
+        _target[0] = getUniswapConnectAddress();
         _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", eth, crv, amt, unitAmt, 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }

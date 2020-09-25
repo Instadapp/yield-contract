@@ -117,7 +117,7 @@ contract LogicOne is DSMath {
     function claimComp(address[] calldata tokens) external {
         address[] memory _target = new address[](1);
         bytes[] memory _data = new bytes[](1);
-        _target[0] = getCompConnectAddress(); // Comp connector
+        _target[0] = getCompConnectAddress();
         _data[0] = abi.encodeWithSignature("ClaimCompTwo(address[],uint256)", tokens, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
@@ -125,7 +125,7 @@ contract LogicOne is DSMath {
     function swapComp(uint amt, uint unitAmt) external {
         address[] memory _target = new address[](1);
         bytes[] memory _data = new bytes[](1);
-        _target[0] = getUniswapConnectAddress(); // Uniswap Connector
+        _target[0] = getUniswapConnectAddress();
         _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", getEthAddress(), getCompAddress(), amt, unitAmt, 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }

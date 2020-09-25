@@ -22,6 +22,10 @@ contract LogicOne {
         return 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE; // ETH Address
     }
 
+    function getOriginAddress() private pure returns(address) {
+        return 0xB7fA44c2E964B6EB24893f7082Ecc08c8d0c0F87; // DSA address
+    }
+
     function deploy(address _dsa, address _token, uint amt) public {
         // check if DSA is authorised
         if (_token == getEthAddr()) {
@@ -34,6 +38,7 @@ contract LogicOne {
             amt = amt > _bal ? _bal : amt;
             token.safeTransfer(_dsa, amt);
         }
+        // emit event?
     }
 
     // withdraw assets from DSA
@@ -44,7 +49,7 @@ contract LogicOne {
         _targets[0] = address(0); // Check9898 - address of basic connector
         bytes[] memory _data = new bytes[](1);
         _data[0] = abi.encodeWithSignature("withdraw(address,uint256,address,uint256,uint256)", _token, amt, address(this), uint(0), uint(0));
-        DSAInterface(_dsa).cast(_targets, _data, address(0)); // Check9898 - address of origin
+        DSAInterface(_dsa).cast(_targets, _data, getOriginAddress());
     }
 
     constructor () public {}
