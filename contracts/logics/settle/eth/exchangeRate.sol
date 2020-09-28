@@ -13,6 +13,4 @@ contract LogicOne {
         PoolInterface(address(this)).setExchangeRate();
     }
 
-    receive() external payable {}
-
 }
