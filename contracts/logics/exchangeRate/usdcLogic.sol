@@ -115,22 +115,23 @@ contract UsdcRateLogic is DSMath {
         _netBalInEth = add(_netBalInEth, amtInETH);
     }
 
-    function getNetDsaAssets(address _dsa) private returns (uint256 _netBalInEth) {
-        _netBalInEth = _dsa.balance;
+    function getNetDsaAssetsInEth(address _dsa) private returns (uint256 _netBalInEth) {
         _netBalInEth += getCompoundNetAssetsInEth(_dsa);
         _netBalInEth += getMakerNetAssetsInEth();
         _netBalInEth += getCurveNetAssetsInEth(_dsa);
     }
     
-    function getTotalToken() public returns (uint256) {
+    function getTotalToken() public returns (uint256 usdcBal) {
         address _dsa = 0x0000000000000000000000000000000000000000;
         PriceFeedInterface priceFeedContract = PriceFeedInterface(PriceFeedAddr);
         uint usdcPriceInETH = priceFeedContract.getPrice(usdcAddr);
         
-        uint256 balInEth = poolToken.balance;
-        balInEth += getNetDsaAssets(_dsa);
-        uint balInUsdc = wdiv(balInEth, usdcPriceInETH);
-        return balInUsdc;
+        TokenInterface usdcToken = TokenInterface(usdcAddr);
+        usdcBal = usdcToken.balanceOf(_dsa);
+        usdcBal += TokenInterface(usdcAddr).balanceOf(poolToken);
+
+        uint balInEth = getNetDsaAssetsInEth(_dsa);
+        usdcBal += wdiv(balInEth, usdcPriceInETH);
     }
 
 
@@ -139,6 +140,5 @@ contract UsdcRateLogic is DSMath {
         vaultId = _vaultId;
         dsa = _dsa;
         vaultUrn = ManagerLike(managerAddr).urns(_vaultId);
-
     }
 }
