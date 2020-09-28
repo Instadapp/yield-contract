@@ -12,6 +12,10 @@ interface CTokenInterface {
     function underlying() external view returns (address);
 }
 
+interface TokenInterface {
+    function balanceOf(address owner) external view returns (uint256);
+}
+
 interface CompTroller {
     function getAllMarkets() external view returns (address[] memory);
 }
@@ -20,9 +24,6 @@ interface ICurve {
     function get_virtual_price() external view returns (uint256 out);
 }
 
-interface TokenInterface {
-    function balanceOf(address owner) external view returns (uint256);
-}
 
 interface PriceFeedInterface {
     function getPrices(address[] memory tokens) external view returns (uint256[] memory pricesInETH);
@@ -76,26 +77,26 @@ contract DaiRateLogic is DSMath {
         _netBal = add(_netBal, amtInETH);
     }
 
-    function getNetDsaAssets(address _dsa) private returns (uint256 _netBal) {
-        _netBal = _dsa.balance;
+    function getNetDsaAssetsInEth(address _dsa) private returns (uint256 _netBal) {
         _netBal += getCompoundNetAssetsInEth(_dsa);
         _netBal += getCurveNetAssetsInEth(_dsa);
     }
     
-    function getTotalToken() public returns (uint256) {
+    function getTotalToken() public returns (uint256 _daiBal) {
         address _dsa = 0x0000000000000000000000000000000000000000;
         PriceFeedInterface priceFeedContract = PriceFeedInterface(PriceFeedAddr);
         uint daiPriceInETH = priceFeedContract.getPrice(daiAddr);
-        
-        uint256 balInEth = poolToken.balance;
-        balInEth += getNetDsaAssets(_dsa);
-        uint balInDai = wdiv(balInEth, daiPriceInETH);
-        return balInDai;
+
+        TokenInterface daiToken = TokenInterface(daiAddr);
+        _daiBal = daiToken.balanceOf(poolToken);
+        _daiBal += daiToken.balanceOf(_dsa);
+
+        uint balInEth = getNetDsaAssetsInEth(_dsa);
+        _daiBal = wdiv(balInEth, daiPriceInETH);
     }
 
     constructor (address daiPool, address _dsa) public {
         poolToken = address(daiPool);
         dsa = _dsa;
-
     }
 }
