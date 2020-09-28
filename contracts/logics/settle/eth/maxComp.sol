@@ -129,7 +129,4 @@ contract LogicOne is DSMath {
         _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", getEthAddress(), getCompAddress(), amt, unitAmt, 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
-
-    receive() external payable {}
-
 }
