@@ -94,7 +94,4 @@ contract LogicOne {
         _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", eth, crv, amt, unitAmt, 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
-
-    receive() external payable {}
-
 }
