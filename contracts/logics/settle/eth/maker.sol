@@ -85,7 +85,4 @@ contract LogicOne is DSMath {
         DSAInterface(getDsaAddress()).cast(_targets, _data, getOriginAddress());
         checkMakerVault();
     }
-
-    receive() external payable {}
-
 }
