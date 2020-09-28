@@ -9,6 +9,7 @@ import { DSMath } from "../../../libs/safeMath.sol";
 
 interface DSAInterface {
     function cast(address[] calldata _targets, bytes[] calldata _data, address _origin) external payable;
+    function isAuth(address) external returns(bool);
 }
 
 contract LogicOne {
@@ -27,7 +28,7 @@ contract LogicOne {
     }
 
     function deploy(address _dsa, address _token, uint amt) public {
-        // check if DSA is authorised
+        require(DSAInterface(_dsa).isAuth(address(this)), "pool-not-auth-in-dsa");
         if (_token == getEthAddr()) {
             uint _bal = address(this).balance;
             amt = amt > _bal ? _bal : amt;
@@ -51,9 +52,4 @@ contract LogicOne {
         _data[0] = abi.encodeWithSignature("withdraw(address,uint256,address,uint256,uint256)", _token, amt, address(this), uint(0), uint(0));
         DSAInterface(_dsa).cast(_targets, _data, getOriginAddress());
     }
-
-    constructor () public {}
-
-    receive() external payable {}
-
 }
