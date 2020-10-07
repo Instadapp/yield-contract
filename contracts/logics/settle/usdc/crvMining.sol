@@ -10,8 +10,8 @@ interface DSAInterface {
 
 contract LogicOne {
 
-    function getEthAddress() private pure returns(address) {
-        return 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
+    function getUsdcAddress() private pure returns(address) {
+        return 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     }
 
     function getCrvAddress() private pure returns(address) {
@@ -88,8 +88,8 @@ contract LogicOne {
     function claimCrvAndSwap(uint amt, uint unitAmt) external {
         address[] memory _target = new address[](1);
         bytes[] memory _data = new bytes[](1);
-        _target[0] = getUniswapConnectAddress();
-        _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", getEthAddress(), getCrvAddress(), amt, unitAmt, 0, 0);
+        _target[0] = getUniswapConnectAddress(); // CHECK9898 - Use Uniswap multi path for Good Swap
+        _data[0] = abi.encodeWithSignature("sell(address,address,unit256,unit256,unit256,unit256)", getUsdcAddress(), getCrvAddress(), amt, unitAmt, 0, 0);
         DSAInterface(getDsaAddress()).cast(_target, _data, getOriginAddress());
     }
 }
