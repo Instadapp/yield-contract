@@ -121,13 +121,17 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
   */
   function deposit(uint tknAmt) external payable nonReentrant whenNotPaused returns (uint mintAmt) {
     require(msg.value == 0, "non-eth-pool");
+    require(tknAmt != 0, "tknAmt-is-zero");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
     require(_newTknBal < registry.poolCap(address(this)), "pool-cap-reached");
+    uint initalBal = baseToken.balanceOf(address(this));
     baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-    mintAmt = wmul(tknAmt, exchangeRate);
+    uint finalBal = baseToken.balanceOf(address(this));
+    uint _tknAmt = sub(finalBal, initalBal);
+    mintAmt = wmul(_tknAmt, exchangeRate);
     _mint(msg.sender, mintAmt);
-    emit LogDeposit(msg.sender, tknAmt, mintAmt);
+    emit LogDeposit(msg.sender, _tknAmt, mintAmt);
   }
 
   /**
