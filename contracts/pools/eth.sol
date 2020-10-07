@@ -102,6 +102,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param _data array of connector's function calldata
   */
   function settle(address[] calldata _targets, bytes[] calldata _data) external isChief {
+    require(_targets.length != 0, "targets-length-zero");
     require(_targets.length == _data.length , "array-length-invalid");
     require(registry.checkSettleLogics(address(this), _targets), "not-logic");
     for (uint i = 0; i < _targets.length; i++) {
