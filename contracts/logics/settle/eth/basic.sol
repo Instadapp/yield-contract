@@ -9,7 +9,8 @@ import { DSMath } from "../../../libs/safeMath.sol";
 
 interface DSAInterface {
     function cast(address[] calldata _targets, bytes[] calldata _data, address _origin) external payable;
-    function isAuth(address) external returns(bool);
+    function isAuth(address) external view returns(bool);
+
 }
 
 contract LogicOne {
