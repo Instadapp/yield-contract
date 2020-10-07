@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import { DSMath } from "../libs/safeMath.sol";
 
@@ -146,7 +147,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     require(wdAmt <= address(this).balance, "not-enough-liquidity-available");
 
     _burn(msg.sender, _burnAmt);
-    payable(target).transfer(wdAmt);
+    Address.sendValue(payable(target), wdAmt);
 
     emit LogWithdraw(msg.sender, wdAmt, _burnAmt);
   }
@@ -159,7 +160,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   function withdrawFee(uint wdAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
     if (wdAmt > feeAmt) wdAmt = feeAmt;
-    msg.sender.transfer(wdAmt);
+    Address.sendValue(payable(msg.sender), wdAmt);
     feeAmt = sub(feeAmt, wdAmt);
     emit LogWithdrawFee(wdAmt);
   }
