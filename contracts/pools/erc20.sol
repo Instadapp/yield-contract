@@ -118,7 +118,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) external payable whenNotPaused returns (uint mintAmt) {
+  function deposit(uint tknAmt) external payable nonReentrant whenNotPaused returns (uint mintAmt) {
     require(msg.value == 0, "non-eth-pool");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
