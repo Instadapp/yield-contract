@@ -105,6 +105,7 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param _data array of connector's function calldata
   */
   function settle(address[] calldata _targets, bytes[] calldata _data) external isChief {
+    require(_targets.length != 0, "targets-length-zero");
     require(_targets.length == _data.length , "array-length-invalid");
     require(registry.checkSettleLogics(address(this), _targets), "not-logic");
     for (uint i = 0; i < _targets.length; i++) {
@@ -118,15 +119,19 @@ contract PoolToken is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) external payable whenNotPaused returns (uint mintAmt) {
+  function deposit(uint tknAmt) external payable nonReentrant whenNotPaused returns (uint mintAmt) {
     require(msg.value == 0, "non-eth-pool");
+    require(tknAmt != 0, "tknAmt-is-zero");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
     require(_newTknBal < registry.poolCap(address(this)), "pool-cap-reached");
+    uint initalBal = baseToken.balanceOf(address(this));
     baseToken.safeTransferFrom(msg.sender, address(this), tknAmt);
-    mintAmt = wmul(tknAmt, exchangeRate);
+    uint finalBal = baseToken.balanceOf(address(this));
+    uint _tknAmt = sub(finalBal, initalBal);
+    mintAmt = wmul(_tknAmt, exchangeRate);
     _mint(msg.sender, mintAmt);
-    emit LogDeposit(msg.sender, tknAmt, mintAmt);
+    emit LogDeposit(msg.sender, _tknAmt, mintAmt);
   }
 
   /**

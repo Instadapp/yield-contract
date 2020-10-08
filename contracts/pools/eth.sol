@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20Pausable.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
 
 import { DSMath } from "../libs/safeMath.sol";
 
@@ -102,6 +103,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param _data array of connector's function calldata
   */
   function settle(address[] calldata _targets, bytes[] calldata _data) external isChief {
+    require(_targets.length != 0, "targets-length-zero");
     require(_targets.length == _data.length , "array-length-invalid");
     require(registry.checkSettleLogics(address(this), _targets), "not-logic");
     for (uint i = 0; i < _targets.length; i++) {
@@ -115,7 +117,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     * @param tknAmt token amount
     * @return mintAmt amount of wrap token minted
   */
-  function deposit(uint tknAmt) external whenNotPaused payable returns (uint mintAmt) {
+  function deposit(uint tknAmt) external nonReentrant whenNotPaused payable returns (uint mintAmt) {
     require(tknAmt == msg.value, "unmatched-amount");
     uint _tokenBal = wdiv(totalSupply(), exchangeRate);
     uint _newTknBal = add(_tokenBal, tknAmt);
@@ -145,7 +147,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
     require(wdAmt <= address(this).balance, "not-enough-liquidity-available");
 
     _burn(msg.sender, _burnAmt);
-    payable(target).transfer(wdAmt);
+    Address.sendValue(payable(target), wdAmt);
 
     emit LogWithdraw(msg.sender, wdAmt, _burnAmt);
   }
@@ -158,7 +160,7 @@ contract PoolETH is ReentrancyGuard, ERC20Pausable, DSMath {
   function withdrawFee(uint wdAmt) external {
     require(msg.sender == instaIndex.master(), "not-master");
     if (wdAmt > feeAmt) wdAmt = feeAmt;
-    msg.sender.transfer(wdAmt);
+    Address.sendValue(payable(msg.sender), wdAmt);
     feeAmt = sub(feeAmt, wdAmt);
     emit LogWithdrawFee(wdAmt);
   }
